@@ -1,23 +1,26 @@
-# openHASP Manager
+openHASP Manager
 
-A unified toolset for designing and managing openHASP touchscreen panels with Home Assistant.
+A simple, all-in-one way to design and manage openHASP touchscreen panels with Home Assistant.
 
-## Why This Exists
+Why This Exists
 
-Managing openHASP panels traditionally requires a high degree of "manual labor," involving thousands of lines of complex YAML configuration in Home Assistant just to keep track of basic hardware IDs (like `p1b2`). 
+If you’ve ever set up an openHASP panel the traditional way, you’ll know it can get messy fast. You end up dealing with loads of YAML, trying to keep track of things like p1b2, and writing way more config than should be necessary just to control a light.
 
-**openHASP Manager** was built to turn this into a modern, **Zero-Code** experience. It solves the "ID Translation" problem: instead of the user needing to remember that Page 1, Button 2 is the "Living Room Lamp," the integration simply asks the screen what its labels are and presents them to you in a standard, graphical interface.
+openHASP Manager was built to get rid of that headache. Instead of remembering IDs and digging through config files, it talks directly to your panel, reads what’s on the screen, and shows everything in a clean, easy-to-use interface. What used to be confusing and manual becomes straightforward and visual.
 
-### The "Point and Click" Philosophy
-This project replaces the traditional YAML-first workflow with a unified GUI experience:
-1. **Visual Design:** Use the web-based designer to create your screen layout (No JSON/JSONL knowledge required).
-2. **Auto-Discovery:** Press a button on your physical panel, and it instantly appears in Home Assistant.
-3. **Graphical Mapping:** Select a Home Assistant entity from a dropdown to map it to a button. No code, no templates, no manual MQTT subscriptions.
+The “Point and Click” Approach
 
-### Comparison with Official openHASP Integration
-While an official `openhasp` custom component exists, it operates on a different philosophy:
-- **Official Integration:** Focuses on granular control of every individual LVGL object property via heavy YAML and Jinja2 templates. It is powerful for developers but a high barrier for most users.
-- **openHASP Manager (This Plugin):** Focuses on **Auto-Discovery** and **Zero-Code Mapping**. It is designed for users who want to design their screen visually and then "Point and Click" to connect buttons to lights, switches, or scenes without writing a single line of code.
+This project is all about replacing the YAML-heavy workflow with something much more intuitive:
+
+Visual Design – Build your screen layout in a web-based designer. No need to touch JSON or JSONL.
+Auto-Discovery – Press a button on your panel and it instantly shows up in Home Assistant.
+Easy Mapping – Pick a Home Assistant entity from a dropdown and link it to a button. No code, no templates, no messing with MQTT.
+How It Compares to the Official Integration
+
+There is an official openHASP integration, but it’s built with a different type of user in mind:
+
+Official Integration – Gives you very detailed control over every LVGL object using YAML and Jinja2. It’s powerful, but can be overwhelming unless you’re comfortable with that level of config.
+openHASP Manager (This Plugin) – Focuses on simplicity. You design your UI visually, then just point and click to connect buttons to lights, switches, or scenes—no coding required.
 
 ## Home Assistant Installation
 
