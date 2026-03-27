@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>openHASP UI Designer</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #09090b; --panel-bg: #18181b;
+            --primary: #3f3f46; --primary-hover: #52525b;
+            --accent: #3b82f6; --accent-hover: #2563eb;
+            --secondary: #10b981; --danger: #ef4444;
+            --text-main: #fafafa; --text-muted: #a1a1aa;
+            --border: #27272a;
+            --select-color: #3b82f6;
+            --lvgl-screen-bg: #000000;
+            --lvgl-btn-shadow: rgba(0,0,0,0.5);
+            --lvgl-btn-radius: 6px;
+        }
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background-color: var(--bg-dark); color: var(--text-main); margin: 0; padding: 20px; height: 100vh; display: flex; gap: 20px; overflow: hidden; }
+        .sidebar { flex: 0 0 320px; background: var(--panel-bg); border-right: 1px solid var(--border); border-radius: 0; padding: 24px 16px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; margin: -20px 0 -20px -20px; }
+        .main-content { flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+        h1, h3, h4 { margin: 0; font-weight: 600; }
+        h1 { font-size: 1.1rem; color: #fff; letter-spacing: -0.02em; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+        .section { background: transparent; border-radius: 0; padding: 0; border: none; }
+        h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 12px; }
+        .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .col { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+        label { font-size: 11px; color: var(--text-muted); }
+        button { background: var(--primary); color: white; border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 12px; transition: 0.15s; flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+        button:hover { background: var(--primary-hover); border-color: #3f3f46; }
+        button.accent { background: var(--accent); border-color: transparent; }
+        button.accent:hover { background: var(--accent-hover); }
+        button.danger { background: rgba(239, 68, 68, 0.1); color: var(--danger); border-color: rgba(239, 68, 68, 0.2); }
+        button.danger:hover { background: var(--danger); color: #fff; }
+        button.success { background: var(--secondary); border: none; }
+        button.dark { background: #27272a; border-color: #3f3f46; }
+        input, select, textarea { background: #09090b; border: 1px solid var(--border); color: #fff; padding: 10px; border-radius: 6px; font-size: 13px; outline: none; width: 100%; box-sizing: border-box; font-family: inherit; transition: border-color 0.2s; }
+        input:focus, select:focus { border-color: var(--accent); }
+        input[type="color"] { padding: 4px; height: 38px; cursor: pointer; }
+        input[type="checkbox"] { width: auto; cursor: pointer; }
+        
+        .preview-container { flex: 0 0 auto; background: #000; border-radius: 12px; padding: 40px; display: flex; justify-content: center; align-items: center; border: 1px solid var(--border); position: relative; min-height: 200px; box-shadow: inset 0 0 100px rgba(0,0,0,0.5); }
+        .preview-label { position: absolute; top: 12px; left: 16px; font-size: 11px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em; }
+        .toolbar { position: absolute; top: 12px; right: 16px; display: flex; gap: 8px; }
+        .toolbar button { flex: 0 0 auto; font-size: 11px; padding: 5px 10px; }
+        
+        .screen-bezel { background: #1c1c1c; border-radius: 10px; padding: 4px; box-shadow: 0 40px 100px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05); border: 1px solid #333; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .screen { width: 800px; height: 480px; background: var(--lvgl-screen-bg); position: relative; border-radius: 2px; overflow: hidden; font-family: 'Roboto', sans-serif; transition: width 0.3s, height 0.3s; box-shadow: inset 0 0 40px rgba(0,0,0,0.5); }
+        
+        .screen-obj { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; text-align: center; cursor: move; user-select: none; font-family: 'Roboto', sans-serif; transition: box-shadow 0.1s; }
+        .screen-obj.selected { outline: 1px solid var(--select-color); outline-offset: 4px; z-index: 100; }
+        .screen.preview-mode .screen-obj.selected { outline: none; }
+        
+        .screen-obj.obj-btn { background: #2196F3; border-radius: var(--lvgl-btn-radius); box-shadow: 0 2px 4px var(--lvgl-btn-shadow); border: 1px solid rgba(255,255,255,0.1); }
+        .screen-obj.obj-btn.toggled { background: #1565C0; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); }
+        .screen-obj.obj-label { background: transparent; border: none; color: #fff; font-weight: 500; }
+        .screen-obj.obj-label.has-bg { background: rgba(255,255,255,0.05); }
+        .screen-obj.obj-img { background: #111; border: 1px dashed var(--border); color: #333; font-size: 13px; }
+        .screen-obj .mdi { font-size: 34px; line-height: 1; margin-bottom: 4px; }
+        .screen-obj .obj-text { font-size: 13px; white-space: pre-wrap; line-height: 1.2; font-weight: 500; }
+        
+        .resize-handle { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; background: var(--select-color); border-radius: 2px; cursor: nwse-resize; display: none; z-index: 101; border: 2px solid var(--bg-dark); }
+        .screen-obj.selected .resize-handle { display: block; }
+        
+        .code-container { flex: 1; background: var(--panel-bg); border-radius: 12px; padding: 20px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; min-height: 0; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        textarea#code { flex: 1; resize: none; color: #86efac; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.6; background: #09090b; border: 1px solid var(--border); padding: 16px; border-radius: 8px; }
+        .page-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+        .page-tab { padding: 6px 14px; background: #27272a; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; color: var(--text-muted); border: 1px solid var(--border); transition: 0.2s; }
+        .page-tab:hover { background: #3f3f46; color: #fff; }
+        .page-tab.active { background: #fff; color: #000; border-color: #fff; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
+        .checkbox-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+        .checkbox-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+    </style>
+</head>
+<body>
+<div class="sidebar">
+    <h1><span class="mdi mdi-monitor-edit" style="color:var(--accent);"></span> openHASP Designer</h1>
+
+    <!-- Display Resolution -->
+    <div class="section">
+        <h4 style="margin-bottom:8px;">📱 Display Resolution</h4>
+        <select id="resPreset" onchange="applyResolutionPreset()">
+            <option value="800x480">800x480 (7.0" CrowPanel)</option>
+            <option value="480x320">480x320 (3.5" / 4.0")</option>
+            <option value="320x240">320x240 (2.4" / 2.8")</option>
+            <option value="1024x600">1024x600 (10.1")</option>
+            <option value="custom">Custom...</option>
+        </select>
+        <div id="customRes" class="row" style="display:none; margin-top:8px;">
+            <div class="col"><label>Width</label><input type="number" id="resW" value="800" oninput="updateCustomRes()"></div>
+            <div class="col"><label>Height</label><input type="number" id="resH" value="480" oninput="updateCustomRes()"></div>
+        </div>
+    </div>
+
+    <!-- Pages -->
+    <div class="section">
+        <h4 style="margin-bottom:8px;">📄 Pages</h4>
+        <div class="page-tabs" id="pageTabs"></div>
+        <div class="row" style="margin-top:8px;">
+            <button class="dark" onclick="addPage()">+ Add</button>
+            <button class="danger" onclick="deletePage()">- Delete</button>
+        </div>
+    </div>
+
+    <!-- Add Element -->
+    <div class="section" style="display:flex; flex-direction:column; gap:6px;">
+        <h4>➕ Add Element</h4>
+        <select id="objType"><option value="btn">Button</option><option value="label">Label / Title</option><option value="img">Image Area</option></select>
+        <input type="text" id="objText" placeholder="Label text...">
+        <select id="objIcon">
+            <option value="">— No Icon —</option>
+            <optgroup label="Lights"><option value="E335">💡 Lightbulb</option><option value="E90F">💡 Ceiling</option><option value="E769">💡 Floor Lamp</option><option value="EB25">💡 Lamp</option></optgroup>
+            <optgroup label="Rooms"><option value="EFE0">🛋 Living Room</option><option value="E0DD">🛏 Bedroom</option><option value="E0D8">🛁 Bathroom</option><option value="E1B8">🖥 Office</option><option value="EDDE">🍽 Dining</option><option value="EDB8">🏠 Kitchen</option></optgroup>
+            <optgroup label="Controls"><option value="E425">⏻ Power</option><option value="E2C0">♨ Fan</option><option value="E50F">🌡 Thermostat</option><option value="E545">🔒 Lock</option><option value="E99F">📹 Camera</option></optgroup>
+            <optgroup label="Outdoor"><option value="E311">🌲 Outdoor</option><option value="E7FB">🚪 Door</option><option value="E55B">🚗 Garage</option></optgroup>
+        </select>
+        <button class="accent" onclick="addObject()"><span class="mdi mdi-plus"></span> Add to Page</button>
+    </div>
+
+    <!-- Single Properties -->
+    <div class="section" id="panelProperties" style="display:none; flex-direction:column; gap:6px;">
+        <h4>⚙️ Properties</h4>
+        <div class="row">
+            <div class="col"><label>X</label><input type="number" id="propX" oninput="updateProp()"></div>
+            <div class="col"><label>Y</label><input type="number" id="propY" oninput="updateProp()"></div>
+        </div>
+        <div class="row">
+            <div class="col"><label>W</label><input type="number" id="propW" oninput="updateProp()"></div>
+            <div class="col"><label>H</label><input type="number" id="propH" oninput="updateProp()"></div>
+        </div>
+        <div class="col"><label>Text (\\n for newline)</label><input type="text" id="propText" oninput="updatePropText()"></div>
+        <div class="col">
+            <label>Icon</label>
+            <select id="propIcon" onchange="updatePropIcon()">
+                <option value="">— No Icon —</option>
+                <optgroup label="Lights"><option value="E335">💡 Lightbulb</option><option value="E90F">💡 Ceiling</option><option value="E769">💡 Floor Lamp</option><option value="EB25">💡 Lamp</option></optgroup>
+                <optgroup label="Rooms"><option value="EFE0">🛋 Living Room</option><option value="E0DD">🛏 Bedroom</option><option value="E0D8">🛁 Bathroom</option><option value="E1B8">🖥 Office</option><option value="EDDE">🍽 Dining</option><option value="EDB8">🏠 Kitchen</option></optgroup>
+                <optgroup label="Controls"><option value="E425">⏻ Power</option><option value="E2C0">♨ Fan</option><option value="E50F">🌡 Thermostat</option><option value="E545">🔒 Lock</option><option value="E99F">📹 Camera</option></optgroup>
+                <optgroup label="Outdoor"><option value="E311">🌲 Outdoor</option><option value="E7FB">🚪 Door</option><option value="E55B">🚗 Garage</option></optgroup>
+            </select>
+        </div>
+        <div class="row">
+            <div class="col"><label>Background Color</label><input type="color" id="propColor" value="#2196F3" onchange="updatePropColor()"></div>
+            <div class="col"><label>Font Size</label><input type="number" id="propFontSize" value="14" min="8" max="48" oninput="updatePropFontSize()"></div>
+        </div>
+        <div class="row">
+            <button class="dark" onclick="applyColorToAll()" style="font-size:10px;">🎨 Color → All Btns</button>
+            <button class="dark" onclick="applyStyleToAll()" style="font-size:10px;">📋 Style → All Btns</button>
+        </div>
+        <div class="checkbox-row">
+            <input type="checkbox" id="propToggle" onchange="updatePropToggle()">
+            <label for="propToggle">Toggleable (stays pressed)</label>
+        </div>
+        <div class="row">
+            <button class="accent" onclick="duplicateSelected()"><span class="mdi mdi-content-duplicate"></span> Duplicate</button>
+            <button class="danger" onclick="deleteSelected()"><span class="mdi mdi-delete"></span> Delete</button>
+        </div>
+    </div>
+
+    <!-- Multi-Select -->
+    <div class="section" id="panelAlign" style="display:none; flex-direction:column; gap:6px;">
+        <h4>📐 Multi-Select (<span id="selCount">0</span>)</h4>
+        <div class="row">
+            <div class="col"><label>Set All Width</label><input type="number" id="multiW" placeholder="width" oninput="setMultiSize('w')"></div>
+            <div class="col"><label>Set All Height</label><input type="number" id="multiH" placeholder="height" oninput="setMultiSize('h')"></div>
+        </div>
+        <div class="row"><button class="dark" onclick="alignTops()">⬆ Top</button><button class="dark" onclick="alignLefts()">⬅ Left</button></div>
+        <div class="row"><button class="dark" onclick="alignBottoms()">⬇ Bottom</button><button class="dark" onclick="alignRights()">➡ Right</button></div>
+        <div class="row"><button class="dark" onclick="sameWidth()">↔ Match W</button><button class="dark" onclick="sameHeight()">↕ Match H</button></div>
+        <div class="row"><button class="dark" onclick="distributeH()">⇔ Dist H</button><button class="dark" onclick="distributeV()">⇕ Dist V</button></div>
+        <div class="row"><button class="dark" onclick="copyColorFromFirst()">🎨 Match Color</button><button class="dark" onclick="copyStyleFromFirst()">📋 Match Style</button></div>
+        <button class="danger" onclick="deleteSelected()">Delete Selected</button>
+    </div>
+
+    <!-- Tips -->
+    <div style="color: var(--text-muted); font-size: 10px; line-height: 1.5; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--glass-border);">
+        <b>Shortcuts:</b> Shift+Click = multi-select · Ctrl+A = select all · Del = delete · Ctrl+Z = undo · Ctrl+D = duplicate · P = preview mode
+    </div>
+</div>
+
+<div class="main-content">
+    <div class="preview-container" id="scaleWrap">
+        <span class="preview-label" id="resLabel">openHASP Panel — 800×480</span>
+        <div class="toolbar">
+            <button class="dark" id="gridBtn" onclick="toggleGrid()">Grid: 5px</button>
+            <button class="dark" id="previewBtn" onclick="togglePreview()">👁 Preview</button>
+            <button class="dark" onclick="selectAll()">Select All</button>
+        </div>
+        <div class="screen-bezel"><div class="screen" id="screen"></div></div>
+    </div>
+    <div class="code-container">
+        <div class="row">
+            <h3 style="flex:1; font-size:14px; font-weight:600;"><span class="mdi mdi-code-json" style="color:var(--accent);"></span> pages.jsonl</h3>
+            <button class="accent" style="flex:0 0 auto; width:auto; border-radius:4px; font-size:11px;" onclick="importCode()">Load</button>
+            <button class="dark" style="flex:0 0 auto; width:auto; border-radius:4px; font-size:11px;" onclick="copyCode()">Copy</button>
+        </div>
+        <textarea id="code" spellcheck="false"></textarea>
+    </div>
+</div>
+
+<script>
+const MDI_MAP = {
+    'E335':'mdi-lightbulb','E90F':'mdi-ceiling-light','E769':'mdi-floor-lamp',
+    'EB25':'mdi-lamp','EFE0':'mdi-sofa','E0DD':'mdi-bed',
+    'E0D8':'mdi-bathtub','E1B8':'mdi-desktop-tower-monitor','EDDE':'mdi-silverware-fork-knife',
+    'EDB8':'mdi-stove','E425':'mdi-power','E2C0':'mdi-fan',
+    'E50F':'mdi-thermometer','E545':'mdi-lock','E99F':'mdi-cctv',
+    'E311':'mdi-pine-tree','E7FB':'mdi-door','E55B':'mdi-garage',
+};
+
+const state = {
+    pages: { 1: [] }, currPage: 1, nextId: 10, selection: new Set(),
+    gridSnap: 5, previewMode: false, history: [],
+    width: 800, height: 480
+};
+
+// Example starter layout — 4 demo buttons
+state.pages[1] = [
+    { id:1, obj:"label", x:0, y:10, w:800, h:40, text:"My Dashboard", icon:"", color:"#121212", fontSize:24 },
+    { id:2, obj:"btn", x:20, y:70, w:175, h:120, text:"Button 1", icon:"E335", toggle:true, fontSize:13 },
+    { id:3, obj:"btn", x:215, y:70, w:175, h:120, text:"Button 2", icon:"E90F", toggle:true, fontSize:13 },
+    { id:4, obj:"btn", x:410, y:70, w:175, h:120, text:"Button 3", icon:"E425", toggle:false, fontSize:13 },
+    { id:5, obj:"btn", x:605, y:70, w:175, h:120, text:"Button 4", icon:"E2C0", toggle:true, fontSize:13 }
+];
+
+let isDragging=false, isResizing=false, dragStartX, dragStartY, dragStartPos={}, resizeTarget=null, autoEvt=false;
+
+function snap(v) { return Math.round(v / state.gridSnap) * state.gridSnap; }
+function saveHistory() { state.history.push(JSON.parse(JSON.stringify(state.pages))); if(state.history.length > 50) state.history.shift(); }
+function undo() { if(state.history.length > 0) { state.pages = state.history.pop(); state.selection.clear(); renderTabs(); renderScreen(); } }
+
+function init() {
+    requestAnimationFrame(() => updateScale());
+    window.addEventListener('resize', updateScale);
+    
+    document.getElementById('screen').addEventListener('mousedown', e => {
+        if(e.target.id === 'screen') { if(!e.shiftKey) state.selection.clear(); renderScreen(); }
+    });
+
+    document.addEventListener('keydown', e => {
+        const tag = document.activeElement.tagName;
+        if(['INPUT','TEXTAREA','SELECT'].includes(tag)) return;
+        if(e.key === 'Delete' || e.key === 'Backspace') { saveHistory(); deleteSelected(); }
+        if(e.key === 'a' && (e.ctrlKey||e.metaKey)) { e.preventDefault(); selectAll(); }
+        if(e.key === 'z' && (e.ctrlKey||e.metaKey)) { e.preventDefault(); undo(); }
+        if(e.key === 'd' && (e.ctrlKey||e.metaKey)) { e.preventDefault(); saveHistory(); duplicateSelected(); }
+        if(e.key === 'p' || e.key === 'P') togglePreview();
+    });
+
+    saveHistory();
+    renderTabs(); renderScreen();
+}
+
+function updateScale() {
+    const wrapW = document.getElementById('scaleWrap').clientWidth - 40;
+    const wrapH = document.getElementById('scaleWrap').clientHeight - 60;
+    const scaleW = wrapW / (state.width + 40);
+    const scaleH = wrapH / (state.height + 60);
+    const scale = Math.min(1, scaleW, scaleH);
+    const bezel = document.querySelector('.screen-bezel');
+    bezel.style.transform = `scale(${scale})`; bezel.style.transformOrigin = 'top center';
+}
+
+function applyResolutionPreset() {
+    const preset = document.getElementById('resPreset').value;
+    const customDiv = document.getElementById('customRes');
+    if(preset === 'custom') {
+        customDiv.style.display = 'flex';
+    } else {
+        customDiv.style.display = 'none';
+        const [w, h] = preset.split('x').map(Number);
+        updateResolution(w, h);
+    }
+}
+
+function updateCustomRes() {
+    const w = parseInt(document.getElementById('resW').value) || 800;
+    const h = parseInt(document.getElementById('resH').value) || 480;
+    updateResolution(w, h);
+}
+
+function updateResolution(w, h) {
+    state.width = w; state.height = h;
+    const screen = document.getElementById('screen');
+    screen.style.width = w + 'px';
+    screen.style.height = h + 'px';
+    document.getElementById('resLabel').innerText = `openHASP Panel — ${w}×${h}`;
+    updateScale();
+    renderScreen();
+}
+
+// Pages
+function renderTabs() {
+    const tabs = document.getElementById('pageTabs'); tabs.innerHTML = '';
+    Object.keys(state.pages).sort((a,b)=>a-b).forEach(p => {
+        const n=parseInt(p), d=document.createElement('div');
+        d.className = `page-tab ${n===state.currPage?'active':''}`;
+        d.innerText = `Page ${n}`;
+        d.onclick = () => { state.currPage=n; state.selection.clear(); renderTabs(); renderScreen(); };
+        tabs.appendChild(d);
+    });
+}
+function addPage() { const m=Math.max(...Object.keys(state.pages).map(Number),0); state.pages[m+1]=[]; state.currPage=m+1; renderTabs(); renderScreen(); }
+function deletePage() {
+    if(Object.keys(state.pages).length<=1) return alert("Can't delete last page.");
+    if(confirm(`Delete Page ${state.currPage}?`)) { delete state.pages[state.currPage]; state.currPage=parseInt(Object.keys(state.pages).sort((a,b)=>a-b)[0]); renderTabs(); renderScreen(); }
+}
+
+// Objects
+function addObject() {
+    saveHistory();
+    const type=document.getElementById('objType').value, txt=document.getElementById('objText').value||(type==='btn'?'Button':type==='label'?'Title':''), icon=document.getElementById('objIcon').value;
+    const o = { id:++state.nextId, obj:type, text:txt, icon:type!=='img'?icon:'', x:20, y:70, w:type==='label'?state.width:175, h:type==='label'?40:120, toggle:type==='btn', color:type==='label'?'#121212':undefined, src:type==='img'?'':undefined, fontSize:type==='label'?24:13 };
+    state.pages[state.currPage].push(o);
+    state.selection.clear(); state.selection.add(o.id);
+    document.getElementById('objText').value = '';
+    renderScreen();
+}
+function getSelected() { return state.pages[state.currPage].filter(o => state.selection.has(o.id)); }
+function deleteSelected() { state.pages[state.currPage]=state.pages[state.currPage].filter(o=>!state.selection.has(o.id)); state.selection.clear(); renderScreen(); }
+function duplicateSelected() { saveHistory(); getSelected().forEach(o => { state.pages[state.currPage].push({...o, id:++state.nextId, x:o.x+20, y:o.y+20}); }); renderScreen(); }
+function selectAll() { state.pages[state.currPage].forEach(o => state.selection.add(o.id)); renderScreen(); }
+
+// Render
+function renderScreen() {
+    const screen = document.getElementById('screen');
+    screen.innerHTML = '';
+    screen.classList.toggle('preview-mode', state.previewMode);
+    (state.pages[state.currPage]||[]).forEach(obj => {
+        const el = document.createElement('div');
+        el.className = `screen-obj obj-${obj.obj} ${state.selection.has(obj.id)?'selected':''} ${obj.toggle?'':''}`;
+        el.style.cssText = `left:${obj.x}px;top:${obj.y}px;width:${obj.w}px;height:${obj.h}px;`;
+        
+        if(obj.obj==='label') {
+            if(obj.color) { el.classList.add('has-bg'); el.style.background=obj.color; }
+            el.style.fontSize = (obj.fontSize||24)+'px'; el.style.fontWeight='700'; el.style.letterSpacing='1px';
+        }
+        if(obj.obj==='btn' && obj.btnColor) {
+            el.style.background = `linear-gradient(180deg, ${obj.btnColor}, ${darken(obj.btnColor, 20)})`;
+        }
+        if(obj.obj==='img') {
+            el.innerHTML = `<span class="mdi mdi-camera" style="font-size:48px;color:#333;"></span><span style="font-size:11px;color:#444;margin-top:4px;">Camera Feed</span>`;
+        }
+
+        let html = '';
+        if(obj.icon && MDI_MAP[obj.icon]) html += `<span class="mdi ${MDI_MAP[obj.icon]}"></span>`;
+        else if(obj.icon) html += `<span style="font-size:34px;">${String.fromCharCode(parseInt(obj.icon,16))}</span>`;
+        if(obj.text) {
+            const fs = obj.obj==='btn' ? (obj.fontSize||13) : undefined;
+            const style = fs ? `font-size:${fs}px;` : '';
+            html += `<span class="obj-text" style="${style}">${obj.text.replace(/\\n/g,'<br>').replace(/\n/g,'<br>')}</span>`;
+        }
+        if(obj.obj!=='img') el.innerHTML = html;
+
+        // Resize handle
+        const h = document.createElement('div'); h.className='resize-handle';
+        h.onmousedown = e => {
+            e.preventDefault(); e.stopPropagation();
+            saveHistory();
+            isResizing=true; resizeTarget=obj;
+            dragStartX=e.clientX; dragStartY=e.clientY;
+            dragStartPos = {};
+            getSelected().forEach(o => { dragStartPos[o.id] = {w:o.w, h:o.h}; });
+            if(!state.selection.has(obj.id)) {
+                state.selection.clear(); state.selection.add(obj.id);
+                dragStartPos = {}; dragStartPos[obj.id] = {w:obj.w, h:obj.h};
+                renderScreen();
+            }
+        };
+        el.appendChild(h);
+
+        // Drag
+        el.onmousedown = e => {
+            if(isResizing) return;
+            e.preventDefault(); e.stopPropagation();
+            saveHistory();
+            if(e.shiftKey) { state.selection.has(obj.id)?state.selection.delete(obj.id):state.selection.add(obj.id); }
+            else if(!state.selection.has(obj.id)) { state.selection.clear(); state.selection.add(obj.id); }
+            dragStartX=e.clientX; dragStartY=e.clientY; isDragging=true;
+            dragStartPos={}; getSelected().forEach(o=>{dragStartPos[o.id]={x:o.x,y:o.y};});
+            renderScreen();
+        };
+        screen.appendChild(el);
+    });
+    updatePropertiesPanel(); updateCodeArea();
+}
+
+function darken(hex, pct) {
+    let r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+    r=Math.max(0,r-pct); g=Math.max(0,g-pct); b=Math.max(0,b-pct);
+    return '#'+[r,g,b].map(c=>c.toString(16).padStart(2,'0')).join('');
+}
+
+const getScale = () => { 
+    const main = document.querySelector('.main-content');
+    if(!main) return 1;
+    const wrapW = main.clientWidth - 40;
+    const wrapH = main.clientHeight - 250; // Leave room for code area and margins
+    const scaleW = wrapW / (state.width + 40);
+    const scaleH = wrapH / (state.height + 60);
+    return Math.max(0.2, Math.min(1, scaleW, scaleH));
+};
+
+window.addEventListener('mousemove', e => {
+    const sc = getScale();
+    if(isDragging) {
+        const dx=Math.round((e.clientX-dragStartX)/sc), dy=Math.round((e.clientY-dragStartY)/sc);
+        getSelected().forEach(o => {
+            if(!dragStartPos[o.id]) return;
+            o.x=snap(dragStartPos[o.id].x+dx); o.y=snap(dragStartPos[o.id].y+dy);
+            o.x=Math.max(0,Math.min(o.x,state.width-o.w)); o.y=Math.max(0,Math.min(o.y,state.height-o.h));
+        });
+        renderScreen();
+    } else if(isResizing) {
+        const dx=Math.round((e.clientX-dragStartX)/sc), dy=Math.round((e.clientY-dragStartY)/sc);
+        getSelected().forEach(o => {
+            if(!dragStartPos[o.id]) return;
+            o.w = Math.max(30, snap(dragStartPos[o.id].w + dx));
+            o.h = Math.max(20, snap(dragStartPos[o.id].h + dy));
+        });
+        renderScreen();
+    }
+});
+window.addEventListener('mouseup', ()=>{ isDragging=false; isResizing=false; resizeTarget=null; });
+
+// Properties
+function updatePropertiesPanel() {
+    const prop=document.getElementById('panelProperties'), align=document.getElementById('panelAlign'), sel=getSelected();
+    if(sel.length===1) {
+        prop.style.display='flex'; align.style.display='none'; autoEvt=true;
+        document.getElementById('propX').value=sel[0].x;
+        document.getElementById('propY').value=sel[0].y;
+        document.getElementById('propW').value=sel[0].w;
+        document.getElementById('propH').value=sel[0].h;
+        document.getElementById('propText').value=sel[0].text||'';
+        document.getElementById('propIcon').value=sel[0].icon||'';
+        document.getElementById('propToggle').checked=!!sel[0].toggle;
+        document.getElementById('propColor').value=sel[0].btnColor||sel[0].color||'#2196F3';
+        document.getElementById('propFontSize').value=sel[0].fontSize||13;
+        autoEvt=false;
+    } else if(sel.length>1) {
+        prop.style.display='none'; align.style.display='flex';
+        document.getElementById('selCount').textContent=sel.length;
+    } else { prop.style.display='none'; align.style.display='none'; }
+}
+function updateProp() { if(autoEvt) return; const o=getSelected()[0]; if(!o) return; o.x=parseInt(document.getElementById('propX').value)||0; o.y=parseInt(document.getElementById('propY').value)||0; o.w=parseInt(document.getElementById('propW').value)||10; o.h=parseInt(document.getElementById('propH').value)||10; renderScreen(); }
+function updatePropText() { if(autoEvt) return; const o=getSelected()[0]; if(o) o.text=document.getElementById('propText').value; renderScreen(); }
+function updatePropIcon() { if(autoEvt) return; const o=getSelected()[0]; if(o) o.icon=document.getElementById('propIcon').value; renderScreen(); }
+function updatePropToggle() { if(autoEvt) return; const o=getSelected()[0]; if(o) o.toggle=document.getElementById('propToggle').checked; renderScreen(); }
+function updatePropColor() { if(autoEvt) return; const o=getSelected()[0]; if(!o) return; if(o.obj==='btn') o.btnColor=document.getElementById('propColor').value; else o.color=document.getElementById('propColor').value; renderScreen(); }
+function updatePropFontSize() { if(autoEvt) return; const o=getSelected()[0]; if(o) o.fontSize=parseInt(document.getElementById('propFontSize').value)||13; renderScreen(); }
+
+// Copy color/style to all buttons on page
+function applyColorToAll() {
+    const o=getSelected()[0]; if(!o) return; saveHistory();
+    const col = o.btnColor || o.color;
+    state.pages[state.currPage].filter(b=>b.obj==='btn').forEach(b => { b.btnColor = col; });
+    renderScreen();
+}
+function applyStyleToAll() {
+    const o=getSelected()[0]; if(!o) return; saveHistory();
+    const col=o.btnColor||o.color, fs=o.fontSize, tog=o.toggle;
+    state.pages[state.currPage].filter(b=>b.obj==='btn').forEach(b => { b.btnColor=col; b.fontSize=fs; b.toggle=tog; });
+    renderScreen();
+}
+// Copy color/style from first selected to rest of selection
+function copyColorFromFirst() {
+    const s=getSelected(); if(s.length<2) return; saveHistory();
+    const col=s[0].btnColor||s[0].color;
+    s.forEach(o => { if(o.obj==='btn') o.btnColor=col; else o.color=col; });
+    renderScreen();
+}
+function copyStyleFromFirst() {
+    const s=getSelected(); if(s.length<2) return; saveHistory();
+    const col=s[0].btnColor||s[0].color, fs=s[0].fontSize, tog=s[0].toggle;
+    s.forEach(o => { if(o.obj==='btn'){o.btnColor=col;o.fontSize=fs;o.toggle=tog;} });
+    renderScreen();
+}
+
+// Multi-select size
+function setMultiSize(dim) {
+    const v = parseInt(document.getElementById(dim==='w'?'multiW':'multiH').value);
+    if(!v || v < 10) return;
+    getSelected().forEach(o => { o[dim] = v; });
+    renderScreen();
+}
+
+// Alignment
+function alignTops(){const s=getSelected();if(s.length<2)return;const v=Math.min(...s.map(o=>o.y));s.forEach(o=>o.y=v);renderScreen();}
+function alignLefts(){const s=getSelected();if(s.length<2)return;const v=Math.min(...s.map(o=>o.x));s.forEach(o=>o.x=v);renderScreen();}
+function alignBottoms(){const s=getSelected();if(s.length<2)return;const v=Math.max(...s.map(o=>o.y+o.h));s.forEach(o=>o.y=v-o.h);renderScreen();}
+function alignRights(){const s=getSelected();if(s.length<2)return;const v=Math.max(...s.map(o=>o.x+o.w));s.forEach(o=>o.x=v-o.w);renderScreen();}
+function sameWidth(){const s=getSelected();if(s.length<2)return;s.forEach(o=>o.w=s[0].w);renderScreen();}
+function sameHeight(){const s=getSelected();if(s.length<2)return;s.forEach(o=>o.h=s[0].h);renderScreen();}
+function distributeH(){const s=getSelected().sort((a,b)=>a.x-b.x);if(s.length<3)return;const g=(s[s.length-1].x-s[0].x)/(s.length-1);s.forEach((o,i)=>{o.x=snap(s[0].x+g*i);});renderScreen();}
+function distributeV(){const s=getSelected().sort((a,b)=>a.y-b.y);if(s.length<3)return;const g=(s[s.length-1].y-s[0].y)/(s.length-1);s.forEach((o,i)=>{o.y=snap(s[0].y+g*i);});renderScreen();}
+
+// Toolbar
+function toggleGrid() {
+    state.gridSnap = state.gridSnap===5?10:state.gridSnap===10?20:state.gridSnap===20?1:5;
+    document.getElementById('gridBtn').textContent = `Grid: ${state.gridSnap}px`;
+}
+function togglePreview() {
+    state.previewMode = !state.previewMode;
+    document.getElementById('previewBtn').textContent = state.previewMode ? '✏️ Edit' : '👁 Preview';
+    renderScreen();
+}
+
+// Code
+function updateCodeArea() {
+    let text='';
+    Object.keys(state.pages).sort((a,b)=>a-b).forEach(pNum => {
+        state.pages[pNum].forEach(obj => {
+            const out={page:parseInt(pNum),id:obj.id,obj:obj.obj,x:obj.x,y:obj.y,w:obj.w,h:obj.h};
+            if(obj.obj==='label'){if(obj.color)out.bg_color=obj.color;out.align=1;out.text_font=obj.fontSize||32;}
+            if(obj.obj==='btn'){out.toggle=!!obj.toggle; if(obj.btnColor) out.bg_color=obj.btnColor; if(obj.fontSize && obj.fontSize!==13) out.text_font=obj.fontSize;}
+            if(obj.obj==='img'){out.src=obj.src||'';out.action='back';}
+            let enc='';
+            if(obj.icon)enc+=`\\u${obj.icon}`;
+            if(obj.icon&&obj.text)enc+='\\n';
+            if(obj.text)enc+=obj.text.replace(/\n/g,'\\n');
+            if(enc||obj.obj!=='img')out.text=enc;
+            let str=JSON.stringify(out);
+            str=str.replace(/\\\\u/g,'\\u').replace(/\\\\n/g,'\\n');
+            text+=str+'\n';
+        });
+        text+='\n';
+    });
+    document.getElementById('code').value=text.trim();
+}
+function copyCode(){const ta=document.getElementById('code');ta.select();navigator.clipboard.writeText(ta.value);alert('Copied!');}
+
+function importCode() {
+    const text=document.getElementById('code').value, lines=text.split('\n'), np={};
+    let maxId=99;
+    lines.forEach(line=>{
+        if(!line.trim())return;
+        try{
+            const j=JSON.parse(line);if(!j.page)return;if(!np[j.page])np[j.page]=[];
+            let ih='',lt=j.text||'';
+            if(lt.length>0){const fc=lt.charCodeAt(0);if(fc>=0xE000){ih=fc.toString(16).toUpperCase();const nl=lt.indexOf('\n');lt=nl!==-1?lt.substring(nl+1):lt.substring(1);}}
+            np[j.page].push({id:j.id,obj:j.obj,text:lt,icon:ih,x:j.x||0,y:j.y||0,w:j.w||100,h:j.h||100,toggle:!!j.toggle,color:j.bg_color,src:j.src,action:j.action,fontSize:j.text_font||13});
+            if(j.id>maxId)maxId=j.id;
+        }catch(e){}
+    });
+    if(Object.keys(np).length>0){for(let k in state.pages)delete state.pages[k];for(let k in np)state.pages[k]=np[k];state.nextId=maxId+1;state.currPage=parseInt(Object.keys(state.pages).sort((a,b)=>a-b)[0]);state.selection.clear();renderTabs();renderScreen();}
+    else alert('No valid objects found.');
+}
+
+init();
+</script>
+</body>
+</html>

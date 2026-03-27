@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up openHASP Manager",
+        "description": "Enter the MQTT topic prefix for your openHASP plate. This is usually 'hasp/' followed by the plate's hostname (e.g. 'hasp/plate').",
+        "data": {
+          "plate_topic": "MQTT topic prefix"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Map Buttons to Entities",
+        "description": "Assign a Home Assistant entity to each discovered button. Press buttons on your panel first to discover them, then come back here to assign entities.\n\nFormat: pXbY = Page X, Button Y"
+      }
+    }
+  }
+}
