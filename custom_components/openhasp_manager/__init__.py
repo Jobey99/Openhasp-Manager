@@ -20,19 +20,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     topic_prefix = entry.data.get(CONF_PLATE_TOPIC, "hasp/plate")
     mappings = dict(entry.options.get(CONF_BUTTON_MAPPINGS, {}))
 
-    # Register static path for the designer
-    import os
-    static_dir = os.path.join(os.path.dirname(__file__), "www")
-    
-    if os.path.exists(static_dir):
-        hass.http.register_static_path(
-            "/openhasp_manager",
-            static_dir,
-            cache_headers=False,
-        )
-    else:
-        _LOGGER.warning("Designer UI directory not found at %s", static_dir)
-
     manager = OpenHASPManager(hass, entry, topic_prefix, mappings)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = manager
 
