@@ -33,8 +33,6 @@ Click the button below to add the integration to your Home Assistant instance. N
 
 ### 1. Hardware Preparation
 This guide is specifically tailored for the Elecrow CrowPanel 7.0" HMI (hardware version 3.0).
-- Ensure the board is powered via the USB-C port.
-- If using expanding modules (such as mmWave sensors), ensure they are not interfering with the I2C bus during the initial setup or touch screen calibration.
 
 ### 2. Firmware Installation
 1. Connect the panel to your computer via USB.
@@ -45,7 +43,7 @@ This guide is specifically tailored for the Elecrow CrowPanel 7.0" HMI (hardware
 ### 3. UI Design
 1. Open `designer/index.html` in a web browser.
 2. Design your interface using the drag-and-drop editor.
-3. Set your button IDs (e.g., p1b2 for Page 1, Button 2) and labels.
+3. Configure your buttons and pages.
 4. Copy the generated JSONL code from the text area.
 5. In the openHASP web interface, navigate to the File Editor and paste the code into `pages.jsonl`.
 6. Restart the panel to apply the new UI.
