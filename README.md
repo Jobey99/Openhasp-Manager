@@ -48,7 +48,8 @@ This guide is specifically tailored for the Elecrow CrowPanel 7.0" HMI (hardware
 4. Configure the MQTT settings on the panel to point to your Home Assistant MQTT broker (e.g., Mosquitto). Set the Hostname to a recognizable ID, such as `plate`.
 
 ### 3. UI Design
-1. Open `designer/index.html` in a web browser.
+1. Access the built-in designer at: `http://<YOUR_HA_IP>:8123/openhasp_manager/designer.html`
+   - *(Alternative: Open `designer/index.html` from the repository locally)*
 2. Design your interface using the drag-and-drop editor.
 3. Configure your buttons and pages (The designer handles the IDs automatically).
 4. Copy the generated JSONL code from the text area.

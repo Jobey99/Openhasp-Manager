@@ -20,6 +20,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     topic_prefix = entry.data.get(CONF_PLATE_TOPIC, "hasp/plate")
     mappings = dict(entry.options.get(CONF_BUTTON_MAPPINGS, {}))
 
+    # Register static path for the designer
+    hass.http.register_static_path(
+        "/openhasp_manager",
+        hass.config.path("custom_components/openhasp_manager/www"),
+        cache_headers=False,
+    )
+
     manager = OpenHASPManager(hass, entry, topic_prefix, mappings)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = manager
 
