@@ -21,17 +21,18 @@ There is an official openHASP integration, but it’s built with a different typ
 
 ## Home Assistant Installation
 
-> [!IMPORTANT]
-> The Home Assistant "Add" button below **only works after** you have manually copied the integration files into your `custom_components` folder and restarted Home Assistant.
+### 🚀 Recommended: Automatic Install via HACS
+The easiest way to install and keep this integration updated is through [HACS](https://hacs.xyz/):
 
-Click the button below to add the integration to your Home Assistant instance:
+1. Open **HACS** in Home Assistant.
+2. Click the three dots (⋮) top right and select **Custom repositories**.
+3. Paste: `https://github.com/Jobey99/Openhasp-Manager`
+4. Select **Integration** and click **Add**.
+5. Once added, click the button below or search for "openHASP Manager" in HACS to install.
 
-[![Open your Home Assistant instance and start a set up flow of a specific integration.](https://my.home-assistant.io/badges/config_flow.svg)](https://my.home-assistant.io/redirect/config_flow/?domain=openhasp_manager)
+[![Open your Home Assistant instance and open the repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?repository=Openhasp-Manager&owner=Jobey99&category=integration)
 
-### Manual Installation
-1. Copy the `custom_components/openhasp_manager` directory to your Home Assistant `/config/custom_components/` folder.
-2. Restart Home Assistant.
-3. Navigate to Settings > Devices & Services > Add Integration and search for "openHASP Manager".
+
 
 ## From Scratch Setup Guide
 
