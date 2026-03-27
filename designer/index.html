@@ -156,7 +156,20 @@
             <input type="checkbox" id="propToggle" onchange="updatePropToggle()">
             <label for="propToggle">Toggleable (stays pressed)</label>
         </div>
-        <div class="row">
+        <div class="col" style="margin-top:10px;">
+            <label for="propAction"><span class="mdi mdi-link"></span> Navigate to Page</label>
+            <select id="propAction" onchange="updatePropAction()">
+                <option value="">(None - use Home Assistant)</option>
+                <option value="page 1">Page 1 (Home)</option>
+                <option value="page 2">Page 2</option>
+                <option value="page 3">Page 3</option>
+                <option value="page 4">Page 4</option>
+                <option value="page next">Next Page</option>
+                <option value="page prev">Previous Page</option>
+                <option value="page back">Back</option>
+            </select>
+        </div>
+        <div class="row" style="margin-top:16px;">
             <button class="accent" onclick="duplicateSelected()"><span class="mdi mdi-content-duplicate"></span> Duplicate</button>
             <button class="danger" onclick="deleteSelected()"><span class="mdi mdi-delete"></span> Delete</button>
         </div>
@@ -440,6 +453,7 @@ function updatePropertiesPanel() {
         document.getElementById('propText').value=sel[0].text||'';
         document.getElementById('propIcon').value=sel[0].icon||'';
         document.getElementById('propToggle').checked=!!sel[0].toggle;
+        document.getElementById('propAction').value=sel[0].action ? sel[0].action.down : "";
         document.getElementById('propColor').value=sel[0].btnColor||sel[0].color||'#2196F3';
         document.getElementById('propFontSize').value=sel[0].fontSize||13;
         autoEvt=false;
@@ -452,6 +466,7 @@ function updateProp() { if(autoEvt) return; const o=getSelected()[0]; if(!o) ret
 function updatePropText() { if(autoEvt) return; const o=getSelected()[0]; if(o) o.text=document.getElementById('propText').value; renderScreen(); }
 function updatePropIcon() { if(autoEvt) return; const o=getSelected()[0]; if(o) o.icon=document.getElementById('propIcon').value; renderScreen(); }
 function updatePropToggle() { if(autoEvt) return; const o=getSelected()[0]; if(o) o.toggle=document.getElementById('propToggle').checked; renderScreen(); }
+function updatePropAction() { if(autoEvt) return; const o=getSelected()[0]; if(!o) return; const val=document.getElementById('propAction').value; if(val) o.action={down:val}; else delete o.action; renderScreen(); }
 function updatePropColor() { if(autoEvt) return; const o=getSelected()[0]; if(!o) return; if(o.obj==='btn') o.btnColor=document.getElementById('propColor').value; else o.color=document.getElementById('propColor').value; renderScreen(); }
 function updatePropFontSize() { if(autoEvt) return; const o=getSelected()[0]; if(o) o.fontSize=parseInt(document.getElementById('propFontSize').value)||13; renderScreen(); }
 
@@ -525,6 +540,7 @@ function updateCodeArea() {
             if(obj.icon&&obj.text)enc+='\\n';
             if(obj.text)enc+=obj.text.replace(/\n/g,'\\n');
             if(enc||obj.obj!=='img')out.text=enc;
+            if(obj.action) out.action=obj.action;
             let str=JSON.stringify(out);
             str=str.replace(/\\\\u/g,'\\u').replace(/\\\\n/g,'\\n');
             text+=str+'\n';
