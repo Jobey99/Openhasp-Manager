@@ -10,9 +10,11 @@ If you’ve ever set up an openHASP panel the traditional way, you’ll know it 
 
 ### The “Point and Click” Approach
 This project is all about replacing the YAML-heavy workflow with something much more intuitive:
-1. **Visual Design** – Build your screen layout in the web-based designer. No need to touch JSON or JSONL.
-2. **Auto-Discovery** – Press a button on your panel and it instantly shows up in Home Assistant.
-3. **Easy Mapping** – Pick a Home Assistant entity from a dropdown and link it to a button. No code, no templates, no messing with MQTT.
+- **Zero-Code Mapping:** Press a button/gauge on your screen, and it instantly appears in Home Assistant. Just pick the entity you want to control or display (now including Sensors and Thermostats!).
+- **Visual UI Designer:** A drag-and-drop editor that generates the necessary JSONL code for your panel.
+- **Smart Data Sync:** 
+  - **Sensors:** Map a temperature sensor to a Gauge or Label; the integration handles the math and units automatically.
+  - **Thermostats:** Map a climate entity to a label or buttons; use `+`/`-` buttons on the panel to change setpoints without any YAML.
 
 ### How It Compares to the Official Integration
 There is an official openHASP integration, but it’s built with a different type of user in mind:
@@ -50,6 +52,8 @@ This guide is specifically tailored for the Elecrow CrowPanel 7.0" HMI (hardware
 ### 3. UI Design
 1. Open `designer/index.html` in a web browser.
 2. Design your interface using the drag-and-drop editor.
+   - Use the **Gauge** component for temperature, humidity, or power.
+   - Use the **Thermostat Preset** to instantly add a climate control block.
 3. Configure your buttons and pages (The designer handles the IDs automatically).
 4. Copy the generated JSONL code from the text area.
 5. In the openHASP web interface, navigate to the File Editor and paste the code into `pages.jsonl`.

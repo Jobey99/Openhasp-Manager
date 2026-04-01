@@ -110,7 +110,12 @@
     <!-- Add Element -->
     <div class="section" style="display:flex; flex-direction:column; gap:6px;">
         <h4>➕ Add Element</h4>
-        <select id="objType"><option value="btn">Button</option><option value="label">Label / Title</option><option value="img">Image Area</option></select>
+        <select id="objType">
+            <option value="btn">Button</option>
+            <option value="label">Label / Title</option>
+            <option value="gauge">Gauge (Temp/Humidity)</option>
+            <option value="img">Image Area</option>
+        </select>
         <input type="text" id="objText" placeholder="Label text...">
         <select id="objIcon">
             <option value="">— No Icon —</option>
@@ -120,6 +125,7 @@
             <optgroup label="Outdoor"><option value="E311">🌲 Outdoor</option><option value="E7FB">🚪 Door</option><option value="E55B">🚗 Garage</option></optgroup>
         </select>
         <button class="accent" onclick="addObject()"><span class="mdi mdi-plus"></span> Add to Page</button>
+        <button class="dark" onclick="addThermostatPreset()" style="margin-top:4px;"><span class="mdi mdi-thermometer-plus"></span> Add Thermostat Preset</button>
     </div>
 
     <!-- Single Properties -->
@@ -155,6 +161,13 @@
         <div class="checkbox-row">
             <input type="checkbox" id="propToggle" onchange="updatePropToggle()">
             <label for="propToggle">Toggleable (stays pressed)</label>
+        </div>
+        <div id="gaugeProps" style="display:none; flex-direction:column; gap:6px;">
+            <div class="row">
+                <div class="col"><label>Min</label><input type="number" id="propMin" oninput="updatePropGauge()"></div>
+                <div class="col"><label>Max</label><input type="number" id="propMax" oninput="updatePropGauge()"></div>
+            </div>
+            <div class="col"><label>Critical Value</label><input type="number" id="propCritical" oninput="updatePropGauge()"></div>
         </div>
         <div class="col" style="margin-top:10px;">
             <label for="propAction"><span class="mdi mdi-link"></span> Navigate to Page</label>
@@ -327,11 +340,34 @@ function deletePage() {
 // Objects
 function addObject() {
     saveHistory();
-    const type=document.getElementById('objType').value, txt=document.getElementById('objText').value||(type==='btn'?'Button':type==='label'?'Title':''), icon=document.getElementById('objIcon').value;
-    const o = { id:++state.nextId, obj:type, text:txt, icon:type!=='img'?icon:'', x:20, y:70, w:type==='label'?state.width:175, h:type==='label'?40:120, toggle:type==='btn', color:type==='label'?'#121212':undefined, src:type==='img'?'':undefined, fontSize:type==='label'?24:13 };
+    const type=document.getElementById('objType').value, txt=document.getElementById('objText').value||(type==='btn'?'Button':type==='label'?'Title':type==='gauge'?'Gauge':''), icon=document.getElementById('objIcon').value;
+    const o = { 
+        id:++state.nextId, obj:type, text:txt, icon:type!=='img'&&type!=='gauge'?icon:'', 
+        x:20, y:70, w:type==='label'?state.width:type==='gauge'?150:175, h:type==='label'?40:type==='gauge'?150:120, 
+        toggle:type==='btn', color:type==='label'?'#121212':undefined, btnColor:type==='btn'?'#2196F3':undefined, src:type==='img'?'':undefined, fontSize:type==='label'?24:13 
+    };
+    if(type==='gauge') {
+        o.min = 0; o.max = 100; o.val = 50; o.critical = 90;
+    }
     state.pages[state.currPage].push(o);
     state.selection.clear(); state.selection.add(o.id);
     document.getElementById('objText').value = '';
+    renderScreen();
+}
+
+function addThermostatPreset() {
+    saveHistory();
+    const baseX = 20, baseY = 70;
+    const objs = [
+        { id:++state.nextId, obj:"label", text:"Heating", x:baseX, y:baseY, w:200, h:30, fontSize:14, color:"#333" },
+        { id:++state.nextId, obj:"label", text:"72°", x:baseX, y:baseY+30, w:200, h:60, fontSize:32, color:"#111" },
+        { id:++state.nextId, obj:"btn", text:"-", x:baseX, y:baseY+100, w:95, h:50, fontSize:20, btnColor:"#3f3f46" },
+        { id:++state.nextId, obj:"btn", text:"+", x:baseX+105, y:baseY+100, w:95, h:50, fontSize:20, btnColor:"#ef4444" },
+        { id:++state.nextId, obj:"label", text:"Current: 70°", x:baseX, y:baseY+160, w:200, h:30, fontSize:12, color:"transparent" }
+    ];
+    state.pages[state.currPage].push(...objs);
+    state.selection.clear();
+    objs.forEach(o => state.selection.add(o.id));
     renderScreen();
 }
 function getSelected() { return state.pages[state.currPage].filter(o => state.selection.has(o.id)); }
@@ -359,6 +395,21 @@ function renderScreen() {
         if(obj.obj==='img') {
             el.innerHTML = `<span class="mdi mdi-camera" style="font-size:48px;color:#333;"></span><span style="font-size:11px;color:#444;margin-top:4px;">Camera Feed</span>`;
         }
+        if(obj.obj==='gauge') {
+            const range = (obj.max || 100) - (obj.min || 0);
+            const percent = (((obj.val || 0) - (obj.min || 0)) / range) * 100;
+            const rot = (percent * 2.4) - 120; // -120 to 120 degrees
+            el.style.borderRadius = '50%';
+            el.style.background = '#111';
+            el.style.border = '4px solid #333';
+            el.innerHTML = `
+                <div style="position:absolute; width:4px; height:45%; background:var(--accent); bottom:50%; transform-origin:bottom; transform:rotate(${rot}deg); border-radius:2px;"></div>
+                <div style="position:absolute; bottom:20px; font-size:10px; color:var(--text-muted);">${obj.min||0}</div>
+                <div style="position:absolute; top:50%; transform:translateY(-50%); font-size:24px; font-weight:700;">${obj.val||0}</div>
+                <div style="position:absolute; bottom:20px; right:20px; font-size:10px; color:var(--text-muted);">${obj.max||100}</div>
+                <div style="position:absolute; bottom:40px; font-size:11px; color:#fff;">${obj.text||''}</div>
+            `;
+        }
 
         let html = '';
         if(obj.icon && MDI_MAP[obj.icon]) html += `<span class="mdi ${MDI_MAP[obj.icon]}"></span>`;
@@ -368,7 +419,7 @@ function renderScreen() {
             const style = fs ? `font-size:${fs}px;` : '';
             html += `<span class="obj-text" style="${style}">${obj.text.replace(/\\n/g,'<br>').replace(/\n/g,'<br>')}</span>`;
         }
-        if(obj.obj!=='img') el.innerHTML = html;
+        if(obj.obj!=='img' && obj.obj!=='gauge') el.innerHTML = html;
 
         // Resize handle
         const h = document.createElement('div'); h.className='resize-handle';
@@ -456,6 +507,17 @@ function updatePropertiesPanel() {
         document.getElementById('propAction').value=sel[0].action ? sel[0].action.down : "";
         document.getElementById('propColor').value=sel[0].btnColor||sel[0].color||'#2196F3';
         document.getElementById('propFontSize').value=sel[0].fontSize||13;
+        
+        const gProps = document.getElementById('gaugeProps');
+        if(sel[0].obj === 'gauge') {
+            gProps.style.display = 'flex';
+            document.getElementById('propMin').value = sel[0].min || 0;
+            document.getElementById('propMax').value = sel[0].max || 100;
+            document.getElementById('propCritical').value = sel[0].critical || 90;
+        } else {
+            gProps.style.display = 'none';
+        }
+        
         autoEvt=false;
     } else if(sel.length>1) {
         prop.style.display='none'; align.style.display='flex';
@@ -469,6 +531,15 @@ function updatePropToggle() { if(autoEvt) return; const o=getSelected()[0]; if(o
 function updatePropAction() { if(autoEvt) return; const o=getSelected()[0]; if(!o) return; const val=document.getElementById('propAction').value; if(val) o.action={down:val}; else delete o.action; renderScreen(); }
 function updatePropColor() { if(autoEvt) return; const o=getSelected()[0]; if(!o) return; if(o.obj==='btn') o.btnColor=document.getElementById('propColor').value; else o.color=document.getElementById('propColor').value; renderScreen(); }
 function updatePropFontSize() { if(autoEvt) return; const o=getSelected()[0]; if(o) o.fontSize=parseInt(document.getElementById('propFontSize').value)||13; renderScreen(); }
+function updatePropGauge() {
+    if(autoEvt) return;
+    const o = getSelected()[0];
+    if(!o || o.obj !== 'gauge') return;
+    o.min = parseInt(document.getElementById('propMin').value) || 0;
+    o.max = parseInt(document.getElementById('propMax').value) || 100;
+    o.critical = parseInt(document.getElementById('propCritical').value) || 90;
+    renderScreen();
+}
 
 // Copy color/style to all buttons on page
 function applyColorToAll() {
@@ -534,12 +605,17 @@ function updateCodeArea() {
             const out={page:parseInt(pNum),id:obj.id,obj:obj.obj,x:obj.x,y:obj.y,w:obj.w,h:obj.h};
             if(obj.obj==='label'){if(obj.color)out.bg_color=obj.color;out.align=1;out.text_font=obj.fontSize||32;}
             if(obj.obj==='btn'){out.toggle=!!obj.toggle; if(obj.btnColor) out.bg_color=obj.btnColor; if(obj.fontSize && obj.fontSize!==13) out.text_font=obj.fontSize;}
+            if(obj.obj==='gauge'){out.min=obj.min||0; out.max=obj.max||100; out.critical_value=obj.critical||90; out.val=obj.val||0;}
             if(obj.obj==='img'){out.src=obj.src||'';out.action='back';}
             let enc='';
-            if(obj.icon)enc+=`\\u${obj.icon}`;
-            if(obj.icon&&obj.text)enc+='\\n';
-            if(obj.text)enc+=obj.text.replace(/\n/g,'\\n');
-            if(enc||obj.obj!=='img')out.text=enc;
+            if(obj.obj!=='gauge') {
+                if(obj.icon)enc+=`\\u${obj.icon}`;
+                if(obj.icon&&obj.text)enc+='\\n';
+                if(obj.text)enc+=obj.text.replace(/\n/g,'\\n');
+            } else {
+                if(obj.text) enc = obj.text;
+            }
+            if(enc||(obj.obj!=='img' && obj.obj!=='gauge'))out.text=enc;
             if(obj.action) out.action=obj.action;
             let str=JSON.stringify(out);
             str=str.replace(/\\\\u/g,'\\u').replace(/\\\\n/g,'\\n');
@@ -560,7 +636,11 @@ function importCode() {
             const j=JSON.parse(line);if(!j.page)return;if(!np[j.page])np[j.page]=[];
             let ih='',lt=j.text||'';
             if(lt.length>0){const fc=lt.charCodeAt(0);if(fc>=0xE000){ih=fc.toString(16).toUpperCase();const nl=lt.indexOf('\n');lt=nl!==-1?lt.substring(nl+1):lt.substring(1);}}
-            np[j.page].push({id:j.id,obj:j.obj,text:lt,icon:ih,x:j.x||0,y:j.y||0,w:j.w||100,h:j.h||100,toggle:!!j.toggle,color:j.bg_color,src:j.src,action:j.action,fontSize:j.text_font||13});
+            np[j.page].push({
+                id:j.id,obj:j.obj,text:lt,icon:ih,x:j.x||0,y:j.y||0,w:j.w||100,h:j.h||100,
+                toggle:!!j.toggle,color:j.bg_color,src:j.src,action:j.action,fontSize:j.text_font||13,
+                min:j.min, max:j.max, critical:j.critical_value, val:j.val
+            });
             if(j.id>maxId)maxId=j.id;
         }catch(e){}
     });

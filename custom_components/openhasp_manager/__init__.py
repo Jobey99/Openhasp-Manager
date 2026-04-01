@@ -162,19 +162,49 @@ class OpenHASPManager:
             )
 
         event = payload.get("event")
-        if event != "up":
-            return  # Only act on button release
+        val = payload.get("val")
 
         # Check if this button has a mapped entity
         target_entity = self.mappings.get(obj_id)
         if not target_entity:
-            _LOGGER.debug("Button %s pressed but no entity mapped", obj_id)
             return
 
-        _LOGGER.info("Button %s pressed → toggling %s", obj_id, target_entity)
+        domain = target_entity.split(".")[0]
+
+        # Handle value changes (for sliders, gauges, etc. that might be used for setpoints)
+        if val is not None and domain == "climate":
+            self.hass.async_create_task(
+                self.hass.services.async_call(
+                    "climate",
+                    "set_temperature",
+                    {"entity_id": target_entity, "temperature": float(val)},
+                )
+            )
+            return
+
+        if event != "up":
+            return  # Only act on button release for toggles/actions
+
+        _LOGGER.info("Button %s pressed (event: %s) → action on %s", obj_id, event, target_entity)
+
+        # Handle Climate Setpoint Buttons (+ / -)
+        if domain == "climate":
+            # Get button text to see if it's a +/- control
+            btn_text = self.discovered_buttons.get(obj_id, "").lower()
+            state = self.hass.states.get(target_entity)
+            if state and ("+" in btn_text or "up" in btn_text or "inc" in btn_text):
+                new_temp = float(state.attributes.get("temperature", 20)) + 0.5
+                self.hass.async_create_task(
+                    self.hass.services.async_call("climate", "set_temperature", {"entity_id": target_entity, "temperature": new_temp})
+                )
+            elif state and ("-" in btn_text or "down" in btn_text or "dec" in btn_text):
+                new_temp = float(state.attributes.get("temperature", 20)) - 0.5
+                self.hass.async_create_task(
+                    self.hass.services.async_call("climate", "set_temperature", {"entity_id": target_entity, "temperature": new_temp})
+                )
+            return
 
         # Toggle the mapped entity
-        domain = target_entity.split(".")[0]
         if domain in ("light", "switch", "fan", "input_boolean"):
             self.hass.async_create_task(
                 self.hass.services.async_call(
@@ -213,32 +243,61 @@ class OpenHASPManager:
 
         @callback
         def _state_changed(event) -> None:
-            """When a mapped HA entity changes, update the button on the panel."""
+            """When a mapped HA entity changes, update the panel."""
             entity_id = event.data.get("entity_id")
             new_state = event.data.get("new_state")
             if new_state is None:
                 return
 
-            # Find which button(s) map to this entity
-            for btn_id, mapped_entity in self.mappings.items():
+            # Find buttons/objects that map to this entity
+            for obj_id, mapped_entity in self.mappings.items():
                 if mapped_entity == entity_id:
-                    val = 1 if new_state.state == "on" else 0
-                    topic = f"{self.topic_prefix}/command/{btn_id}.val"
-                    self.hass.async_create_task(
-                        mqtt.async_publish(self.hass, topic, str(val))
-                    )
+                    self.hass.async_create_task(self._update_obj_from_state(obj_id, new_state))
 
         self._unsub_state.append(
             async_track_state_change_event(self.hass, entity_ids, _state_changed)
         )
 
+    async def _update_obj_from_state(self, obj_id, state) -> None:
+        """Intelligently update a panel object based on HA state and object type."""
+        domain = state.entity_id.split(".")[0]
+        
+        # Determine the target property (val for gauges/sliders, text for labels, etc)
+        # We don't know the exact object type here without querying, 
+        # so we rely on the HA domain and common conventions.
+        
+        if domain in ("light", "switch", "fan", "input_boolean"):
+            val = 1 if state.state == "on" else 0
+            await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.val", str(val))
+        
+        elif domain == "sensor":
+            # For sensors, try to send to .val (if gauge) AND .text (if label)
+            # openHASP ignores commands for properties that don't exist, so this is safe.
+            try:
+                val = float(state.state)
+                await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.val", str(val))
+            except (ValueError, TypeError):
+                pass
+            
+            unit = state.attributes.get("unit_of_measurement", "")
+            text = f"{state.state}{unit}"
+            await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.text", text)
+
+        elif domain == "climate":
+            # If it's a label, show current temp. If it's a button/val, show target.
+            curr_temp = state.attributes.get("current_temperature")
+            target_temp = state.attributes.get("temperature")
+            
+            if curr_temp is not None:
+                await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.text", f"{curr_temp}°")
+            if target_temp is not None:
+                await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.val", str(target_temp))
+
     async def _sync_all_button_states(self) -> None:
-        """Push current state of all mapped entities to the panel buttons."""
-        for btn_id, entity_id in self.mappings.items():
+        """Push current state of all mapped entities to the panel."""
+        for obj_id, entity_id in self.mappings.items():
             if not entity_id:
                 continue
             state = self.hass.states.get(entity_id)
             if state:
-                val = 1 if state.state == "on" else 0
-                topic = f"{self.topic_prefix}/command/{btn_id}.val"
-                await mqtt.async_publish(self.hass, topic, str(val))
+                await self._update_obj_from_state(obj_id, state)
