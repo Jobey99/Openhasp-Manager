@@ -163,6 +163,7 @@ class OpenHASPManager:
 
         event = payload.get("event")
         val = payload.get("val")
+        color = payload.get("color")
 
         # Check if this button has a mapped entity
         target_entity = self.mappings.get(obj_id)
@@ -171,16 +172,45 @@ class OpenHASPManager:
 
         domain = target_entity.split(".")[0]
 
-        # Handle value changes (for sliders, gauges, etc. that might be used for setpoints)
-        if val is not None and domain == "climate":
-            self.hass.async_create_task(
-                self.hass.services.async_call(
-                    "climate",
-                    "set_temperature",
-                    {"entity_id": target_entity, "temperature": float(val)},
-                )
-            )
+        # Handle Dropdown changes (val = index)
+        if val is not None and event == "changed" and domain == "input_select":
+            state = self.hass.states.get(target_entity)
+            if state:
+                options = state.attributes.get("options", [])
+                try:
+                    selected_opt = options[int(val)]
+                    self.hass.async_create_task(
+                        self.hass.services.async_call("input_select", "select_option", {"entity_id": target_entity, "option": selected_opt})
+                    )
+                except (IndexError, ValueError):
+                    pass
             return
+            
+        # Handle RGB color wheel changes
+        if color is not None and domain == "light":
+            if isinstance(color, str) and color.startswith("#"):
+                r = int(color[1:3], 16)
+                g = int(color[3:5], 16)
+                b = int(color[5:7], 16)
+                self.hass.async_create_task(
+                    self.hass.services.async_call("light", "turn_on", {"entity_id": target_entity, "rgb_color": [r, g, b]})
+                )
+            return
+
+        # Handle value/slider changes (Brightness, Fan Speed, Volume, Thermostat)
+        if val is not None and (event == "changed" or event == "up"):
+            if domain == "climate":
+                self.hass.async_create_task(self.hass.services.async_call("climate", "set_temperature", {"entity_id": target_entity, "temperature": float(val)}))
+                return
+            elif domain == "light":
+                self.hass.async_create_task(self.hass.services.async_call("light", "turn_on", {"entity_id": target_entity, "brightness_pct": min(100, int(val))}))
+                return
+            elif domain == "fan":
+                self.hass.async_create_task(self.hass.services.async_call("fan", "set_percentage", {"entity_id": target_entity, "percentage": min(100, int(val))}))
+                return
+            elif domain == "media_player":
+                self.hass.async_create_task(self.hass.services.async_call("media_player", "volume_set", {"entity_id": target_entity, "volume_level": float(val)/100.0}))
+                return
 
         if event != "up":
             return  # Only act on button release for toggles/actions
@@ -189,19 +219,25 @@ class OpenHASPManager:
 
         # Handle Climate Setpoint Buttons (+ / -)
         if domain == "climate":
-            # Get button text to see if it's a +/- control
             btn_text = self.discovered_buttons.get(obj_id, "").lower()
             state = self.hass.states.get(target_entity)
             if state and ("+" in btn_text or "up" in btn_text or "inc" in btn_text):
                 new_temp = float(state.attributes.get("temperature", 20)) + 0.5
-                self.hass.async_create_task(
-                    self.hass.services.async_call("climate", "set_temperature", {"entity_id": target_entity, "temperature": new_temp})
-                )
+                self.hass.async_create_task(self.hass.services.async_call("climate", "set_temperature", {"entity_id": target_entity, "temperature": new_temp}))
             elif state and ("-" in btn_text or "down" in btn_text or "dec" in btn_text):
                 new_temp = float(state.attributes.get("temperature", 20)) - 0.5
-                self.hass.async_create_task(
-                    self.hass.services.async_call("climate", "set_temperature", {"entity_id": target_entity, "temperature": new_temp})
-                )
+                self.hass.async_create_task(self.hass.services.async_call("climate", "set_temperature", {"entity_id": target_entity, "temperature": new_temp}))
+            return
+
+        # Handle Media Player Toggle Buttons (play/pause/next)
+        if domain == "media_player":
+            btn_text = self.discovered_buttons.get(obj_id, "").lower()
+            if "play" in btn_text or "pause" in btn_text:
+                self.hass.async_create_task(self.hass.services.async_call("media_player", "media_play_pause", {"entity_id": target_entity}))
+            elif "next" in btn_text:
+                self.hass.async_create_task(self.hass.services.async_call("media_player", "media_next_track", {"entity_id": target_entity}))
+            elif "prev" in btn_text or "back" in btn_text:
+                self.hass.async_create_task(self.hass.services.async_call("media_player", "media_previous_track", {"entity_id": target_entity}))
             return
 
         # Toggle the mapped entity
@@ -266,10 +302,39 @@ class OpenHASPManager:
         # We don't know the exact object type here without querying, 
         # so we rely on the HA domain and common conventions.
         
-        if domain in ("light", "switch", "fan", "input_boolean"):
-            val = 1 if state.state == "on" else 0
+        if domain in ("light", "switch", "fan", "input_boolean", "media_player"):
+            val = 1 if state.state in ("on", "playing") else 0
             await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.val", str(val))
+            
+            # Update specific slider values if the state is on
+            if state.state in ("on", "playing"):
+                if domain == "light" and "brightness" in state.attributes:
+                    pct = round(state.attributes["brightness"] / 2.55)
+                    await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.val", str(pct))
+                elif domain == "fan" and "percentage" in state.attributes:
+                    await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.val", str(state.attributes["percentage"]))
+                elif domain == "media_player" and "volume_level" in state.attributes:
+                    pct = round(state.attributes["volume_level"] * 100)
+                    await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.val", str(pct))
+                
+                # RGB Color picker sync
+                if domain == "light" and "rgb_color" in state.attributes:
+                    rgb = state.attributes["rgb_color"]
+                    hex_color = f"#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}"
+                    await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.color", hex_color)
         
+        elif domain == "input_select":
+            opts = state.attributes.get("options", [])
+            try:
+                idx = opts.index(state.state)
+                await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.val", str(idx))
+            except ValueError:
+                pass
+            
+            # Push options list string to dropdown
+            opt_str = "\\n".join(opts) # Use explicit \n literal over MQTT
+            await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.options", opt_str)
+
         elif domain == "sensor":
             # For sensors, try to send to .val (if gauge) AND .text (if label)
             # openHASP ignores commands for properties that don't exist, so this is safe.

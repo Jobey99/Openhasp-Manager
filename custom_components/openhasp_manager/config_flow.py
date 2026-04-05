@@ -164,7 +164,7 @@ class OpenHASPManagerOptionsFlow(OptionsFlow):
                 vol.Optional(display_label, default=current_value)
             ] = EntitySelector(
                 EntitySelectorConfig(
-                    domain=["light", "switch", "fan", "input_boolean", "script", "scene", "sensor", "climate"]
+                    domain=["light", "switch", "fan", "input_boolean", "script", "scene", "sensor", "climate", "input_select", "media_player"]
                 )
             )
 
