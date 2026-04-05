@@ -54,13 +54,14 @@
         .screen-obj.selected { outline: 1px solid var(--select-color); outline-offset: 4px; z-index: 100; }
         .screen.preview-mode .screen-obj.selected { outline: none; }
         
-        .screen-obj.obj-btn { background: #2196F3; border-radius: var(--lvgl-btn-radius); box-shadow: 0 2px 4px var(--lvgl-btn-shadow); border: 1px solid rgba(255,255,255,0.1); }
-        .screen-obj.obj-btn.toggled { background: #1565C0; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); }
+        .screen-obj.obj-btn { background: #2196F3; border-radius: var(--lvgl-btn-radius); box-shadow: 0 2px 4px var(--lvgl-btn-shadow); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; transition: transform 0.1s, box-shadow 0.1s; }
+        .screen-obj.obj-btn.toggled { background: rgba(0,0,0,0.3) !important; box-shadow: inset 0 2px 6px rgba(0,0,0,0.6); }
+        .screen-obj.obj-btn.pressed { transform: translateY(2px); box-shadow: inset 0 2px 6px rgba(0,0,0,0.6); }
         .screen-obj.obj-label { background: transparent; border: none; color: #fff; font-weight: 500; }
         .screen-obj.obj-label.has-bg { background: rgba(255,255,255,0.05); }
         .screen-obj.obj-img { background: #111; border: 1px dashed var(--border); color: #333; font-size: 13px; }
-        .screen-obj .mdi { font-size: 34px; line-height: 1; margin-bottom: 4px; }
-        .screen-obj .obj-text { font-size: 13px; white-space: pre-wrap; line-height: 1.2; font-weight: 500; }
+        .screen-obj .mdi { font-size: 34px; line-height: 1; margin-bottom: 4px; pointer-events: none; }
+        .screen-obj .obj-text { font-size: 13px; white-space: pre-wrap; line-height: 1.2; font-weight: 500; pointer-events: none; }
         
         .resize-handle { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; background: var(--select-color); border-radius: 2px; cursor: nwse-resize; display: none; z-index: 101; border: 2px solid var(--bg-dark); }
         .screen-obj.selected .resize-handle { display: block; }
@@ -440,6 +441,16 @@ function renderScreen() {
 
         // Drag
         el.onmousedown = e => {
+            if(state.previewMode) {
+                if(obj.obj === 'btn') {
+                    if(obj.toggle) {
+                        el.classList.toggle('toggled');
+                    } else {
+                        el.classList.add('pressed');
+                    }
+                }
+                return;
+            }
             if(isResizing) return;
             e.preventDefault(); e.stopPropagation();
             saveHistory();
@@ -449,6 +460,20 @@ function renderScreen() {
             dragStartPos={}; getSelected().forEach(o=>{dragStartPos[o.id]={x:o.x,y:o.y};});
             renderScreen();
         };
+
+        el.onmouseup = e => {
+            if(state.previewMode && obj.obj === 'btn' && !obj.toggle) {
+                el.classList.remove('pressed');
+            }
+        };
+
+        el.onmouseleave = e => {
+            if(state.previewMode && obj.obj === 'btn' && !obj.toggle) {
+                el.classList.remove('pressed');
+            }
+            if(isResizing) { } // Let global mouseup handle end of resize/drag
+        };
+
         screen.appendChild(el);
     });
     updatePropertiesPanel(); updateCodeArea();
@@ -588,13 +613,18 @@ function distributeV(){const s=getSelected().sort((a,b)=>a.y-b.y);if(s.length<3)
 
 // Toolbar
 function toggleGrid() {
-    state.gridSnap = state.gridSnap===5?10:state.gridSnap===10?20:state.gridSnap===20?1:5;
+    state.gridSnap = state.gridSnap===5?10:state.gridSnap===20?1:5;
     document.getElementById('gridBtn').textContent = `Grid: ${state.gridSnap}px`;
 }
 function togglePreview() {
     state.previewMode = !state.previewMode;
     document.getElementById('previewBtn').textContent = state.previewMode ? '✏️ Edit' : '👁 Preview';
+    state.selection.clear();
     renderScreen();
+    // In preview mode, sync elements to initial visual states
+    if(state.previewMode) {
+        document.querySelectorAll('.screen-obj').forEach(el => el.classList.remove('selected'));
+    }
 }
 
 // Code
