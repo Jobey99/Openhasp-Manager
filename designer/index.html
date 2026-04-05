@@ -19,9 +19,10 @@
             --lvgl-btn-radius: 6px;
         }
         * { box-sizing: border-box; }
-        body { font-family: 'Inter', -apple-system, sans-serif; background-color: var(--bg-dark); color: var(--text-main); margin: 0; padding: 20px; height: 100vh; display: flex; gap: 20px; overflow: hidden; }
-        .sidebar { flex: 0 0 320px; background: var(--panel-bg); border-right: 1px solid var(--border); border-radius: 0; padding: 24px 16px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; margin: -20px 0 -20px -20px; }
-        .main-content { flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+        body { margin: 0; background: var(--bg-dark); color: #fff; font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { flex: 0 0 320px; background: var(--panel-bg); border-right: 1px solid var(--border); padding: 24px 16px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+        .right-sidebar { flex: 0 0 280px; background: var(--panel-bg); border-left: 1px solid var(--border); padding: 24px 16px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+        .main-content { flex: 1; display: flex; flex-direction: column; background: #000; position: relative; }
         h1, h3, h4 { margin: 0; font-weight: 600; }
         h1 { font-size: 1.1rem; color: #fff; letter-spacing: -0.02em; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
         .section { background: transparent; border-radius: 0; padding: 0; border: none; }
@@ -103,6 +104,11 @@
         <h4 style="margin-bottom:8px;">📄 Pages</h4>
         <div class="page-tabs" id="pageTabs"></div>
         <div class="row" style="margin-top:8px;">
+            <button class="menu-btn" onclick="deleteSelected()" title="Delete">❌</button>
+            <button class="menu-btn" onclick="duplicateSelected()" title="Duplicate">📑</button>
+            <button class="menu-btn" onclick="moveLayerUp()" title="Bring Forward">🔼</button>
+            <button class="menu-btn" onclick="moveLayerDown()" title="Send Backward">🔽</button>
+            <div style="flex:1;"></div>
             <button class="dark" onclick="addPage()">+ Add</button>
             <button class="danger" onclick="deletePage()">- Delete</button>
         </div>
@@ -216,7 +222,7 @@
     </div>
 
     <!-- Tips -->
-    <div style="color: var(--text-muted); font-size: 10px; line-height: 1.5; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--glass-border);">
+    <div style="color: var(--text-muted); font-size: 10px; line-height: 1.5; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--border);">
         <b>Shortcuts:</b> Shift+Click = multi-select · Ctrl+A = select all · Del = delete · Ctrl+Z = undo · Ctrl+D = duplicate · P = preview mode
     </div>
 </div>
@@ -241,6 +247,15 @@
     </div>
 </div>
 
+<div class="right-sidebar">
+    <h4>Layers</h4>
+    <div id="layersList" style="display:flex; flex-direction:column; gap:4px;"></div>
+    <h4 style="margin-top:20px;">Theme</h4>
+    <div class="col"><label>Background</label><input type="color" id="themeBg" value="#000000" onchange="updateTheme()"></div>
+    <div class="col"><label>Primary</label><input type="color" id="themePrimary" value="#2196f3" onchange="updateTheme()"></div>
+    <button class="dark" onclick="exportTheme()">Export Theme</button>
+</div>
+
 <script>
 const MDI_MAP = {
     'E335':'mdi-lightbulb','E90F':'mdi-ceiling-light','E769':'mdi-floor-lamp',
@@ -254,7 +269,8 @@ const MDI_MAP = {
 const state = {
     pages: { 1: [] }, currPage: 1, nextId: 10, selection: new Set(),
     gridSnap: 5, previewMode: false, history: [],
-    width: 800, height: 480
+    width: 800, height: 480,
+    theme: { bg: '#000000', text: '#ffffff', primary: '#2196f3' }
 };
 
 // Example starter layout — 4 demo buttons
@@ -339,10 +355,11 @@ function renderTabs() {
         const n=parseInt(p), d=document.createElement('div');
         d.className = `page-tab ${n===state.currPage?'active':''}`;
         d.innerText = `Page ${n}`;
-        d.onclick = () => { state.currPage=n; state.selection.clear(); renderTabs(); renderScreen(); };
+        d.onclick = () => { changePage(n); };
         tabs.appendChild(d);
     });
 }
+function changePage(n) { state.currPage=n; state.selection.clear(); renderTabs(); renderScreen(); }
 function addPage() { const m=Math.max(...Object.keys(state.pages).map(Number),0); state.pages[m+1]=[]; state.currPage=m+1; renderTabs(); renderScreen(); }
 function deletePage() {
     if(Object.keys(state.pages).length<=1) return alert("Can't delete last page.");
@@ -394,6 +411,30 @@ function addThermostatPreset() {
 function getSelected() { return state.pages[state.currPage].filter(o => state.selection.has(o.id)); }
 function deleteSelected() { state.pages[state.currPage]=state.pages[state.currPage].filter(o=>!state.selection.has(o.id)); state.selection.clear(); renderScreen(); }
 function duplicateSelected() { saveHistory(); getSelected().forEach(o => { state.pages[state.currPage].push({...o, id:++state.nextId, x:o.x+20, y:o.y+20}); }); renderScreen(); }
+
+function moveLayerUp() {
+    const sel = getSelected()[0]; if(!sel) return;
+    const arr = state.pages[state.currPage];
+    const idx = arr.findIndex(o => o.id === sel.id);
+    if(idx < arr.length - 1) {
+        saveHistory();
+        [arr[idx], arr[idx+1]] = [arr[idx+1], arr[idx]];
+        renderScreen();
+    }
+}
+
+function moveLayerDown() {
+    const sel = getSelected()[0]; if(!sel) return;
+    const arr = state.pages[state.currPage];
+    const idx = arr.findIndex(o => o.id === sel.id);
+    if(idx > 0) {
+        saveHistory();
+        [arr[idx], arr[idx-1]] = [arr[idx-1], arr[idx]];
+        renderScreen();
+    }
+}
+
+function clearPage() { if(confirm('Clear all?')) { saveHistory(); state.pages[state.currPage]=[]; renderScreen(); } }
 function selectAll() { state.pages[state.currPage].forEach(o => state.selection.add(o.id)); renderScreen(); }
 
 // Render
@@ -516,12 +557,34 @@ function renderScreen() {
             if(state.previewMode && obj.obj === 'btn' && !obj.toggle) {
                 el.classList.remove('pressed');
             }
-            if(isResizing) { } // Let global mouseup handle end of resize/drag
         };
 
         screen.appendChild(el);
     });
-    updatePropertiesPanel(); updateCodeArea();
+    updateLayers(); updatePropertiesPanel(); updateCodeArea();
+}
+
+function updateLayers() {
+    const list = document.getElementById('layersList');
+    list.innerHTML = '';
+    [...state.pages[state.currPage]].reverse().forEach(o => {
+        const div = document.createElement('div');
+        div.style.padding = '8px 10px';
+        div.style.background = state.selection.has(o.id) ? 'var(--accent)' : 'var(--bg-dark)';
+        div.style.borderRadius = '4px';
+        div.style.cursor = 'pointer';
+        div.style.display = 'flex';
+        div.style.justifyContent = 'space-between';
+        div.style.fontSize = '12px';
+        div.style.border = '1px solid #333';
+        div.innerHTML = `<span><span style="color:#aaa; display:inline-block; width:45px;">[${o.obj}]</span> <span style="font-weight:600">${o.text.substring(0,12) || 'Untitled'}</span></span> <span style="color:#888;">ID: ${o.id}</span>`;
+        div.onclick = (e) => {
+            if(!e.shiftKey) state.selection.clear();
+            state.selection.has(o.id) ? state.selection.delete(o.id) : state.selection.add(o.id);
+            renderScreen();
+        };
+        list.appendChild(div);
+    });
 }
 
 function darken(hex, pct) {
@@ -534,7 +597,7 @@ const getScale = () => {
     const main = document.querySelector('.main-content');
     if(!main) return 1;
     const wrapW = main.clientWidth - 40;
-    const wrapH = main.clientHeight - 250; // Leave room for code area and margins
+    const wrapH = main.clientHeight - 250;
     const scaleW = wrapW / (state.width + 40);
     const scaleH = wrapH / (state.height + 60);
     return Math.max(0.2, Math.min(1, scaleW, scaleH));
@@ -632,6 +695,21 @@ function updatePropOptions() {
     renderScreen();
 }
 
+// Theme logic
+function updateTheme() {
+    state.theme.bg = document.getElementById('themeBg').value;
+    state.theme.primary = document.getElementById('themePrimary').value;
+    document.documentElement.style.setProperty('--lvgl-screen-bg', state.theme.bg);
+    document.documentElement.style.setProperty('--accent', state.theme.primary);
+}
+
+function exportTheme() {
+    const t = {"bg_color": state.theme.bg, "primary_color": state.theme.primary};
+    const blob = new Blob([JSON.stringify(t)+'\n'], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'theme.jsonl'; a.click();
+}
+
 // Copy color/style to all buttons on page
 function applyColorToAll() {
     const o=getSelected()[0]; if(!o) return; saveHistory();
@@ -645,7 +723,6 @@ function applyStyleToAll() {
     state.pages[state.currPage].filter(b=>b.obj==='btn').forEach(b => { b.btnColor=col; b.fontSize=fs; b.toggle=tog; });
     renderScreen();
 }
-// Copy color/style from first selected to rest of selection
 function copyColorFromFirst() {
     const s=getSelected(); if(s.length<2) return; saveHistory();
     const col=s[0].btnColor||s[0].color;
@@ -687,10 +764,6 @@ function togglePreview() {
     document.getElementById('previewBtn').textContent = state.previewMode ? '✏️ Edit' : '👁 Preview';
     state.selection.clear();
     renderScreen();
-    // In preview mode, sync elements to initial visual states
-    if(state.previewMode) {
-        document.querySelectorAll('.screen-obj').forEach(el => el.classList.remove('selected'));
-    }
 }
 
 // Code

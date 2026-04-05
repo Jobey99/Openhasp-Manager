@@ -49,14 +49,15 @@ This guide is specifically tailored for the Elecrow CrowPanel 7.0" HMI (hardware
 3. Connect the panel to your local Wi-Fi network via the internal access point (typically named `openhasp-xxxx`).
 4. Configure the MQTT settings on the panel to point to your Home Assistant MQTT broker (e.g., Mosquitto). Set the Hostname to a recognizable ID, such as `plate`.
 
-### 3. UI Design
-1. Open `designer/index.html` in a web browser.
-2. Design your interface using the drag-and-drop editor.
-   - Use the **Gauge** component for temperature, humidity, or power.
-   - Use the **Thermostat Preset** to instantly add a climate control block.
-3. Configure your buttons and pages (The designer handles the IDs automatically).
-4. Copy the generated JSONL code from the text area.
-5. In the openHASP web interface, navigate to the File Editor and paste the code into `pages.jsonl`.
+### 3. V2 Premium UI Designer
+1. Open the UI Designer (or go to your GitHub Pages URL).
+2. Design your interface using the drag-and-drop editor:
+   - **Advanced Widgets:** Add Sliders (dimming/volume), Arcs, Dropdowns, and Color Wheels!
+   - **Layers Panel:** Use the right-sidebar to track all elements, select hidden ones, and reorder them (Bring Forward / Send Backward).
+   - **Global Theme Editor:** Change the panel's primary background and accent colors instantly. Click "Export Theme" to generate a `theme.jsonl` file alongside your pages!
+   - **Interactive Preview:** Click the 👁 Preview button to interact with your designed buttons and sliders exactly as they will feel on the hardware.
+3. Configure your buttons and pages.
+4. Copy the generated `pages.jsonl` (and `theme.jsonl`) to your openHASP device!
 6. Restart the panel to apply the new UI.
 
 ### 4. Integration Configuration
