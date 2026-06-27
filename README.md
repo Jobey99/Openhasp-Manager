@@ -61,6 +61,15 @@ This guide is specifically tailored for the Elecrow CrowPanel 7.0" HMI (hardware
 6. Restart the panel to apply the new UI.
 
 ### 4. Integration Configuration
+
+> [!IMPORTANT]
+> **MQTT Broker Prerequisites:**
+> - Ensure you have an **MQTT broker** (such as the official **Mosquitto broker** add-on) installed and configured in Home Assistant (**Settings** ➔ **Add-ons**).
+> - For security and connectivity, create a dedicated user for your MQTT devices in Home Assistant (**Settings** ➔ **People** ➔ **Users**).
+> - Configure your physical panel's MQTT settings with your Home Assistant IP address as the **Broker**, and use the MQTT username and password you just created.
+> - Ensure the MQTT status on your panel changes from **Disabled** to **Connected** before proceeding.
+>
+> - 
 1. Once the Home Assistant integration is installed and the panel is online:
 2. Go to the openHASP Manager integration in Home Assistant.
 3. Enter the MQTT topic prefix used by your panel (default: `hasp/plate`).
