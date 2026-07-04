@@ -125,7 +125,7 @@
             <option value="arc">Arc / Dial</option>
             <option value="cpicker">Color Wheel</option>
             <option value="gauge">Gauge</option>
-            <option value="img">Image Area</option>
+            <option value="img">Camera Feed / Image</option>
         </select>
         <input type="text" id="objText" placeholder="Label text...">
         <select id="objIcon">
@@ -238,12 +238,15 @@
         <div class="screen-bezel"><div class="screen" id="screen"></div></div>
     </div>
     <div class="code-container">
-        <div class="row">
-            <h3 style="flex:1; font-size:14px; font-weight:600;"><span class="mdi mdi-code-json" style="color:var(--accent);"></span> pages.jsonl</h3>
-            <button class="accent" style="flex:0 0 auto; width:auto; border-radius:4px; font-size:11px;" onclick="importCode()">Load</button>
-            <button class="dark" style="flex:0 0 auto; width:auto; border-radius:4px; font-size:11px;" onclick="copyCode()">Copy</button>
+        <div class="row" style="flex-wrap:wrap; gap:4px;">
+            <h3 style="flex:1; font-size:14px; font-weight:600; min-width:100px;"><span class="mdi mdi-code-json" style="color:var(--accent);"></span> pages.jsonl</h3>
+            <button class="accent" style="flex:0 0 auto; width:auto; border-radius:4px; font-size:11px; padding:6px 8px;" onclick="importCode()">Load Text</button>
+            <button class="accent" style="flex:0 0 auto; width:auto; border-radius:4px; font-size:11px; padding:6px 8px;" onclick="document.getElementById('fileImport').click()">📂 Open File</button>
+            <input type="file" id="fileImport" accept=".jsonl" style="display:none;" onchange="handleFileImport(event)">
+            <button class="dark" style="flex:0 0 auto; width:auto; border-radius:4px; font-size:11px; padding:6px 8px;" onclick="saveCodeFile()">💾 Save File</button>
+            <button class="dark" style="flex:0 0 auto; width:auto; border-radius:4px; font-size:11px; padding:6px 8px;" onclick="copyCode()">Copy</button>
         </div>
-        <textarea id="code" spellcheck="false"></textarea>
+        <textarea id="code" spellcheck="false" placeholder="Paste pages.jsonl content here and click 'Load Text', or click 'Open File' to upload pages.jsonl"></textarea>
     </div>
 </div>
 
@@ -798,6 +801,25 @@ function updateCodeArea() {
     document.getElementById('code').value=text.trim();
 }
 function copyCode(){const ta=document.getElementById('code');ta.select();navigator.clipboard.writeText(ta.value);alert('Copied!');}
+
+function handleFileImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+        document.getElementById('code').value = evt.target.result;
+        importCode();
+    };
+    reader.readAsText(file);
+}
+
+function saveCodeFile() {
+    updateCodeArea();
+    const text = document.getElementById('code').value;
+    const blob = new Blob([text + '\n'], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'pages.jsonl'; a.click();
+}
 
 function importCode() {
     const text=document.getElementById('code').value, lines=text.split('\n'), np={};

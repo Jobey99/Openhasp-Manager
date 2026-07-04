@@ -8,7 +8,7 @@ import re
 from homeassistant.components import mqtt
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import entity_registry as er, network
 
 from .const import DOMAIN, CONF_PLATE_TOPIC, CONF_BUTTON_MAPPINGS
 
@@ -62,6 +62,7 @@ class OpenHASPManager:
         self.discovered_buttons: dict[str, str] = {}  # {"p1b2": "Living Room Lamp", ...}
         self._unsub_mqtt: list = []
         self._unsub_state: list = []
+        self.current_page = 1
 
     async def async_start(self) -> None:
         """Subscribe to MQTT and start listening for button events."""
@@ -83,6 +84,14 @@ class OpenHASPManager:
 
         # Set up state listeners for all currently mapped entities
         self._setup_state_listeners()
+
+        from datetime import timedelta
+        from homeassistant.helpers.event import async_track_time_interval
+        self._unsub_mqtt.append(
+            async_track_time_interval(
+                self.hass, self._handle_camera_update_timer, timedelta(seconds=5)
+            )
+        )
 
         _LOGGER.info(
             "openHASP Manager started for %s with %d mappings",
@@ -119,7 +128,15 @@ class OpenHASPManager:
         if len(topic_parts) < 4:
             return
 
-        obj_id = topic_parts[-1]  # e.g. "p1b2"
+        obj_id = topic_parts[-1]  # e.g. "p1b2" or "page"
+
+        if obj_id == "page":
+            try:
+                self.current_page = int(msg.payload)
+                _LOGGER.info("Plate %s is now on page %d", self.topic_prefix, self.current_page)
+            except (ValueError, TypeError):
+                pass
+            return
 
         # Only track button objects (pXbY pattern)
         if not re.match(r"p\d+b\d+", obj_id):
@@ -357,6 +374,66 @@ class OpenHASPManager:
                 await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.text", f"{curr_temp}°")
             if target_temp is not None:
                 await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.val", str(target_temp))
+
+        elif domain == "camera":
+            entity_picture = state.attributes.get("entity_picture")
+            if entity_picture:
+                try:
+                    base_url = network.get_url(self.hass, allow_internal=True)
+                except Exception:
+                    base_url = ""
+                if base_url:
+                    import time
+                    timestamp = int(time.time())
+                    full_url = f"{base_url}{entity_picture}&t={timestamp}"
+                    await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.src", full_url)
+
+    @callback
+    def _handle_camera_update_timer(self, now) -> None:
+        """Periodic callback to update cameras."""
+        self.hass.async_create_task(self._async_update_cameras())
+
+    async def _async_update_cameras(self) -> None:
+        """Periodically update camera snapshots on the panel."""
+        for obj_id, target_entity in self.mappings.items():
+            if not target_entity:
+                continue
+            if not target_entity.startswith("camera."):
+                continue
+
+            # Parse page number from obj_id (e.g., "p3b15" -> page 3)
+            match = re.match(r"p(\d+)b\d+", obj_id)
+            if not match:
+                continue
+            obj_page = int(match.group(1))
+
+            # Only update if the panel is currently on the page containing the camera
+            if self.current_page != obj_page:
+                continue
+
+            # Fetch camera state and get entity_picture attribute
+            state = self.hass.states.get(target_entity)
+            if not state:
+                continue
+
+            entity_picture = state.attributes.get("entity_picture")
+            if not entity_picture:
+                continue
+
+            try:
+                base_url = network.get_url(self.hass, allow_internal=True)
+            except Exception:
+                base_url = ""
+
+            if not base_url:
+                continue
+
+            import time
+            timestamp = int(time.time())
+            full_url = f"{base_url}{entity_picture}&t={timestamp}"
+
+            _LOGGER.debug("Periodic camera update for %s -> %s: %s", target_entity, obj_id, full_url)
+            await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.src", full_url)
 
     async def _sync_all_button_states(self) -> None:
         """Push current state of all mapped entities to the panel."""
