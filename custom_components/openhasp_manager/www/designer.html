@@ -137,6 +137,7 @@
         </select>
         <button class="accent" onclick="addObject()"><span class="mdi mdi-plus"></span> Add to Page</button>
         <button class="dark" onclick="addThermostatPreset()" style="margin-top:4px;"><span class="mdi mdi-thermometer-plus"></span> Add Thermostat Preset</button>
+        <button class="dark" onclick="addStatusBarPreset()" style="margin-top:4px;"><span class="mdi mdi-page-layout-header"></span> Add Status Bar (Page 0)</button>
     </div>
 
     <!-- Single Properties -->
@@ -218,6 +219,7 @@
         <div class="row"><button class="dark" onclick="sameWidth()">↔ Match W</button><button class="dark" onclick="sameHeight()">↕ Match H</button></div>
         <div class="row"><button class="dark" onclick="distributeH()">⇔ Dist H</button><button class="dark" onclick="distributeV()">⇕ Dist V</button></div>
         <div class="row"><button class="dark" onclick="copyColorFromFirst()">🎨 Match Color</button><button class="dark" onclick="copyStyleFromFirst()">📋 Match Style</button></div>
+        <div class="row"><button class="dark" onclick="groupSelected()">🔗 Group</button><button class="dark" onclick="ungroupSelected()">🔓 Ungroup</button></div>
         <button class="danger" onclick="deleteSelected()">Delete Selected</button>
     </div>
 
@@ -270,7 +272,7 @@ const MDI_MAP = {
 };
 
 const state = {
-    pages: { 1: [] }, currPage: 1, nextId: 10, selection: new Set(),
+    pages: { 0: [], 1: [] }, currPage: 1, nextId: 15, selection: new Set(),
     gridSnap: 5, previewMode: false, history: [],
     width: 800, height: 480,
     theme: { bg: '#000000', text: '#ffffff', primary: '#2196f3' }
@@ -357,7 +359,7 @@ function renderTabs() {
     Object.keys(state.pages).sort((a,b)=>a-b).forEach(p => {
         const n=parseInt(p), d=document.createElement('div');
         d.className = `page-tab ${n===state.currPage?'active':''}`;
-        d.innerText = `Page ${n}`;
+        d.innerText = n === 0 ? `Global (Page 0)` : `Page ${n}`;
         d.onclick = () => { changePage(n); };
         tabs.appendChild(d);
     });
@@ -445,9 +447,19 @@ function renderScreen() {
     const screen = document.getElementById('screen');
     screen.innerHTML = '';
     screen.classList.toggle('preview-mode', state.previewMode);
-    (state.pages[state.currPage]||[]).forEach(obj => {
+
+    const pageObjs = state.pages[state.currPage] || [];
+    const globalObjs = (state.currPage !== 0) ? (state.pages[0] || []) : [];
+
+    const allObjs = [...globalObjs.map(o => ({...o, isGlobal: true})), ...pageObjs.map(o => ({...o, isGlobal: false}))];
+
+    allObjs.forEach(obj => {
         const el = document.createElement('div');
-        el.className = `screen-obj obj-${obj.obj} ${state.selection.has(obj.id)?'selected':''} ${obj.toggle?'':''}`;
+        el.className = `screen-obj obj-${obj.obj} ${state.selection.has(obj.id)?'selected':''} ${obj.toggle?'':''} ${obj.isGlobal?'global-obj':''}`;
+        if (obj.isGlobal) {
+            el.style.opacity = '0.5';
+            el.style.pointerEvents = 'none';
+        }
         el.style.cssText = `left:${obj.x}px;top:${obj.y}px;width:${obj.w}px;height:${obj.h}px;`;
         
         if(obj.obj==='label') {
@@ -512,43 +524,50 @@ function renderScreen() {
         if(!['img','gauge','slider','arc','cpicker','dropdown'].includes(obj.obj)) el.innerHTML = html;
 
         // Resize handle
-        const h = document.createElement('div'); h.className='resize-handle';
-        h.onmousedown = e => {
-            e.preventDefault(); e.stopPropagation();
-            saveHistory();
-            isResizing=true; resizeTarget=obj;
-            dragStartX=e.clientX; dragStartY=e.clientY;
-            dragStartPos = {};
-            getSelected().forEach(o => { dragStartPos[o.id] = {w:o.w, h:o.h}; });
-            if(!state.selection.has(obj.id)) {
-                state.selection.clear(); state.selection.add(obj.id);
-                dragStartPos = {}; dragStartPos[obj.id] = {w:obj.w, h:obj.h};
-                renderScreen();
-            }
-        };
-        el.appendChild(h);
+        if (!obj.isGlobal) {
+            const h = document.createElement('div'); h.className='resize-handle';
+            h.onmousedown = e => {
+                e.preventDefault(); e.stopPropagation();
+                saveHistory();
+                isResizing=true; resizeTarget=obj;
+                dragStartX=e.clientX; dragStartY=e.clientY;
+                dragStartPos = {};
+                getSelected().forEach(o => { dragStartPos[o.id] = {w:o.w, h:o.h}; });
+                if(!state.selection.has(obj.id)) {
+                    state.selection.clear(); state.selection.add(obj.id);
+                    dragStartPos = {}; dragStartPos[obj.id] = {w:obj.w, h:obj.h};
+                    renderScreen();
+                }
+            };
+            el.appendChild(h);
+        }
 
         // Drag
-        el.onmousedown = e => {
-            if(state.previewMode) {
-                if(obj.obj === 'btn') {
-                    if(obj.toggle) {
-                        el.classList.toggle('toggled');
-                    } else {
-                        el.classList.add('pressed');
+        if (!obj.isGlobal) {
+            el.onmousedown = e => {
+                if(state.previewMode) {
+                    if(obj.obj === 'btn') {
+                        if(obj.toggle) {
+                            el.classList.toggle('toggled');
+                        } else {
+                            el.classList.add('pressed');
+                        }
                     }
+                    return;
                 }
-                return;
-            }
-            if(isResizing) return;
-            e.preventDefault(); e.stopPropagation();
-            saveHistory();
-            if(e.shiftKey) { state.selection.has(obj.id)?state.selection.delete(obj.id):state.selection.add(obj.id); }
-            else if(!state.selection.has(obj.id)) { state.selection.clear(); state.selection.add(obj.id); }
-            dragStartX=e.clientX; dragStartY=e.clientY; isDragging=true;
-            dragStartPos={}; getSelected().forEach(o=>{dragStartPos[o.id]={x:o.x,y:o.y};});
-            renderScreen();
-        };
+                if(isResizing) return;
+                e.preventDefault(); e.stopPropagation();
+                saveHistory();
+                if(e.shiftKey) { state.selection.has(obj.id)?state.selection.delete(obj.id):state.selection.add(obj.id); }
+                else if(!state.selection.has(obj.id)) { state.selection.clear(); state.selection.add(obj.id); }
+                
+                expandGroupSelection();
+                
+                dragStartX=e.clientX; dragStartY=e.clientY; isDragging=true;
+                dragStartPos={}; getSelected().forEach(o=>{dragStartPos[o.id]={x:o.x,y:o.y};});
+                renderScreen();
+            };
+        }
 
         el.onmouseup = e => {
             if(state.previewMode && obj.obj === 'btn' && !obj.toggle) {
@@ -842,6 +861,56 @@ function importCode() {
     else alert('No valid objects found.');
 }
 
+function expandGroupSelection() {
+    const arr = state.pages[state.currPage] || [];
+    let added = false;
+    arr.forEach(o => {
+        if (state.selection.has(o.id) && o.group) {
+            const gid = o.group;
+            arr.forEach(other => {
+                if (other.group === gid && !state.selection.has(other.id)) {
+                    state.selection.add(other.id);
+                    added = true;
+                }
+            });
+        }
+    });
+    return added;
+}
+
+function groupSelected() {
+    const sel = getSelected();
+    if (sel.length < 2) return alert("Select at least 2 widgets to group.");
+    saveHistory();
+    if (!state.nextGroupId) state.nextGroupId = 1;
+    const gid = state.nextGroupId++;
+    sel.forEach(o => { o.group = gid; });
+    alert(`Grouped ${sel.length} widgets.`);
+    renderScreen();
+}
+
+function ungroupSelected() {
+    const sel = getSelected();
+    saveHistory();
+    sel.forEach(o => { delete o.group; });
+    alert("Ungrouped selected widgets.");
+    renderScreen();
+}
+
+function addStatusBarPreset() {
+    saveHistory();
+    if(!state.pages[0]) state.pages[0] = [];
+    state.pages[0] = state.pages[0].filter(o => ![10, 11, 12].includes(o.id));
+    
+    const objs = [
+        { id: 10, obj: "label", text: "", x: 0, y: 0, w: state.width, h: 30, color: "#1f1f23", fontSize: 12 },
+        { id: 11, obj: "label", text: "WiFi 100%", icon: "E63E", x: 10, y: 5, w: 100, h: 20, color: "transparent", fontSize: 12 },
+        { id: 12, obj: "label", text: "12:00 PM", x: state.width - 90, y: 5, w: 80, h: 20, color: "transparent", fontSize: 12 }
+    ];
+    state.pages[0].push(...objs);
+    renderScreen();
+}
+ 
 init();
 </script>
 </body>

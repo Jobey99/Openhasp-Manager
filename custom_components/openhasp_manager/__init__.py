@@ -25,6 +25,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await manager.async_start()
 
+    # Register popup service
+    if not hass.services.has_service(DOMAIN, "push_popup"):
+        async def handle_push_popup(call) -> None:
+            text = call.data.get("text", "")
+            duration = call.data.get("duration", 10)
+            buttons = call.data.get("buttons", ["OK"])
+            
+            for mgr in hass.data[DOMAIN].values():
+                await mgr.async_push_popup(text, duration, buttons)
+
+        hass.services.async_register(DOMAIN, "push_popup", handle_push_popup)
+
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
 
     return True
@@ -128,13 +140,37 @@ class OpenHASPManager:
         if len(topic_parts) < 4:
             return
 
-        obj_id = topic_parts[-1]  # e.g. "p1b2" or "page"
+        obj_id = topic_parts[-1]  # e.g. "p1b2", "page" or "statusupdate"
 
         if obj_id == "page":
             try:
                 self.current_page = int(msg.payload)
                 _LOGGER.info("Plate %s is now on page %d", self.topic_prefix, self.current_page)
             except (ValueError, TypeError):
+                pass
+            return
+
+        if obj_id == "statusupdate":
+            try:
+                payload = json.loads(msg.payload)
+                rssi = payload.get("rssi")
+                if rssi is not None:
+                    icon = "E640"  # wifi-outline
+                    if rssi >= -50:
+                        icon = "E63E"
+                    elif rssi >= -60:
+                        icon = "E63D"
+                    elif rssi >= -70:
+                        icon = "E63C"
+                    elif rssi >= -80:
+                        icon = "E63B"
+                    
+                    pct = min(100, max(0, 2 * (rssi + 100)))
+                    wifi_text = f"\\u{icon} {pct}%"
+                    self.hass.async_create_task(
+                        mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/p0b11.text", wifi_text)
+                    )
+            except Exception:
                 pass
             return
 
@@ -395,6 +431,16 @@ class OpenHASPManager:
 
     async def _async_update_cameras(self) -> None:
         """Periodically update camera snapshots on the panel."""
+        # Update clock on Status Bar preset (Page 0, ID 12)
+        try:
+            import datetime
+            now_time = datetime.datetime.now().strftime("%I:%M %p")
+            if now_time.startswith("0"):
+                now_time = now_time[1:]
+            await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/p0b12.text", now_time)
+        except Exception:
+            pass
+
         for obj_id, target_entity in self.mappings.items():
             if not target_entity:
                 continue
@@ -434,6 +480,20 @@ class OpenHASPManager:
 
             _LOGGER.debug("Periodic camera update for %s -> %s: %s", target_entity, obj_id, full_url)
             await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/{obj_id}.src", full_url)
+
+    async def async_push_popup(self, text: str, duration: int = 10, buttons: list[str] = None) -> None:
+        """Push a message box popup to the openHASP panel."""
+        if not buttons:
+            buttons = ["OK"]
+        payload = {
+            "page": 0,
+            "id": 75,
+            "obj": "msgbox",
+            "text": text,
+            "options": buttons,
+            "auto_close": duration * 1000
+        }
+        await mqtt.async_publish(self.hass, f"{self.topic_prefix}/command/jsonl", json.dumps(payload))
 
     async def _sync_all_button_states(self) -> None:
         """Push current state of all mapped entities to the panel."""
