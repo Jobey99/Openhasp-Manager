@@ -25,6 +25,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await manager.async_start()
 
+    # Forward entry setups to platforms
+    await hass.config_entries.async_forward_entry_setups(entry, ["sensor"])
+
     # Register popup service
     if not hass.services.has_service(DOMAIN, "push_popup"):
         async def handle_push_popup(call) -> None:
@@ -51,10 +54,11 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, ["sensor"])
     manager: OpenHASPManager = hass.data[DOMAIN].pop(entry.entry_id, None)
     if manager:
         await manager.async_stop()
-    return True
+    return unload_ok
 
 
 class OpenHASPManager:
